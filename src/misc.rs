@@ -1,7 +1,11 @@
-use crate::{serenity, Context, Error};
+use crate::{Context, Error, serenity};
 
 /// Evaluates Go code
-#[poise::command(prefix_command, discard_spare_arguments, category = "Miscellaneous")]
+#[poise::command(
+prefix_command,
+category = "Miscellaneous",
+discard_spare_arguments,
+)]
 pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
     use rand::Rng as _;
     if rand::thread_rng().gen_bool(0.01) {
@@ -14,18 +18,21 @@ pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
 
 /// Links to the bot GitHub repo
 #[poise::command(
-    prefix_command,
-    discard_spare_arguments,
-    slash_command,
-    category = "Miscellaneous"
+slash_command,
+category = "Miscellaneous",
+discard_spare_arguments,
 )]
 pub async fn source(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("https://github.com/kangalioo/rustbot").await?;
+    ctx.say("https://github.com/rust-community-discord/rustbot").await?;
     Ok(())
 }
 
 /// Show this menu
-#[poise::command(prefix_command, track_edits, slash_command, category = "Miscellaneous")]
+#[poise::command(
+slash_command,
+category = "Miscellaneous",
+track_edits,
+)]
 pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"]
@@ -46,26 +53,29 @@ You can edit your message to the bot and the bot will edit its response.";
             ..Default::default()
         },
     )
-    .await?;
+        .await?;
     Ok(())
 }
 
 /// Register slash commands in this guild or globally
 ///
 /// Run with no arguments to register in guild, run with argument "global" to register globally.
-#[poise::command(prefix_command, hide_in_help, category = "Miscellaneous")]
+#[poise::command(
+prefix_command,
+category = "Miscellaneous",
+hide_in_help,
+)]
 pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
-    poise::builtins::register_application_commands(ctx, global).await?;
+    poise::builtins::register_application_commands_buttons(ctx).await?;
 
     Ok(())
 }
 
 /// Tells you how long the bot has been up for
 #[poise::command(
-    prefix_command,
-    slash_command,
-    hide_in_help,
-    category = "Miscellaneous"
+slash_command,
+category = "Miscellaneous"
+hide_in_help,
 )]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
     let uptime = std::time::Instant::now() - ctx.data().bot_start_time;
@@ -81,36 +91,8 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
         "Uptime: {}d {}h {}m {}s",
         days, hours, minutes, seconds
     ))
-    .await?;
-
-    Ok(())
-}
-
-/// List servers of which the bot is a member of
-#[poise::command(
-    slash_command,
-    prefix_command,
-    track_edits,
-    hide_in_help,
-    category = "Miscellaneous"
-)]
-pub async fn servers(ctx: Context<'_>) -> Result<(), Error> {
-    poise::builtins::servers(ctx).await?;
-
-    Ok(())
-}
-
-/// Displays the SHA-1 git revision the bot was built against
-#[poise::command(
-    prefix_command,
-    hide_in_help,
-    discard_spare_arguments,
-    category = "Miscellaneous"
-)]
-pub async fn revision(ctx: Context<'_>) -> Result<(), Error> {
-    let rustbot_rev: Option<&'static str> = option_env!("RUSTBOT_REV");
-    ctx.say(format!("`{}`", rustbot_rev.unwrap_or("unknown")))
         .await?;
+
     Ok(())
 }
 
@@ -118,11 +100,10 @@ pub async fn revision(ctx: Context<'_>) -> Result<(), Error> {
 ///
 /// Example: `?conradluget a better computer`
 #[poise::command(
-    prefix_command,
-    slash_command,
-    hide_in_help,
-    track_edits,
-    category = "Miscellaneous"
+slash_command,
+category = "Miscellaneous"
+track_edits,
+hide_in_help,
 )]
 pub async fn conradluget(
     ctx: Context<'_>,
@@ -136,14 +117,15 @@ pub async fn conradluget(
             std::io::Cursor::new(&include_bytes!("../assets/conrad.png")[..]),
             image::ImageFormat::Png,
         )
-        .decode()
-        .expect("failed to load image")
+            .decode()
+            .expect("failed to load image")
     });
     static FONT: Lazy<rusttype::Font> = Lazy::new(|| {
         rusttype::Font::try_from_bytes(include_bytes!("../assets/OpenSans.ttf"))
             .expect("failed to load font")
     });
 
+    let text = format!("Get {}", text);
     let image = imageproc::drawing::draw_text(
         &*BASE_IMAGE,
         image::Rgba([201, 209, 217, 255]),
@@ -151,7 +133,7 @@ pub async fn conradluget(
         286,
         rusttype::Scale::uniform(65.0),
         &FONT,
-        &format!("Get {}", text),
+        &text,
     );
 
     let mut img_bytes = Vec::with_capacity(200_000); // preallocate 200kB for the img
@@ -162,94 +144,9 @@ pub async fn conradluget(
 
     ctx.send(
         poise::CreateReply::new()
-            .attachment(serenity::CreateAttachment::bytes(img_bytes, "unnamed.png")),
+            .attachment(serenity::CreateAttachment::bytes(img_bytes, text + ".png")),
     )
-    .await?;
-
-    Ok(())
-}
-
-/// Use this command to track various types of UB in the beginners help channel.
-///
-/// Example: /ub static_mut
-#[poise::command(slash_command, hide_in_help, category = "Miscellaneous")]
-pub async fn ub(
-    ctx: Context<'_>,
-    #[description = "What kind of UB has been used."] kind: UndefinedBehavior,
-) -> Result<(), Error> {
-    if ctx.channel_id() != ctx.data().beginner_channel {
-        // Ignore any uses outside of the beginner channel
-        ctx.send(poise::CreateReply::new().ephemeral(true).content(format!(
-            "/ub can only be used in <#{}>",
-            ctx.data().beginner_channel.0
-        )))
         .await?;
-        return Ok(());
-    }
-    let channel_id = ctx.channel_id().0;
-
-    let now = std::time::SystemTime::now();
-    let db_time = humantime::format_rfc3339_seconds(now).to_string();
-    let db_channel_id = channel_id.get() as i64;
-
-    let db = &ctx.data().database;
-    let mut transaction = db.begin().await?;
-
-    let old_time = sqlx::query!(
-        "SELECT time FROM ub WHERE channel = ? AND kind = ?",
-        db_channel_id,
-        kind,
-    )
-    .fetch_optional(&mut transaction)
-    .await?;
-
-    sqlx::query!(
-        "INSERT OR REPLACE INTO ub(time, channel, kind) VALUES (?, ?, ?);",
-        db_time,
-        db_channel_id,
-        kind,
-    )
-    .execute(&mut transaction)
-    .await?;
-
-    transaction.commit().await?;
-
-    let msg = if let Some(old_time) = old_time {
-        let old_time = humantime::parse_rfc3339(&old_time.time)?;
-
-        match now.duration_since(old_time) {
-            Ok(duration) => format!(
-                "It has been {} since `{}` has been used in <#{}>.",
-                humantime::format_duration(std::time::Duration::from_secs(duration.as_secs())),
-                kind.name(),
-                channel_id
-            ),
-            Err(e) => format!(
-                "It has been -{} (clock drift?) since `{}` has been used in <#{}>.",
-                humantime::format_duration(std::time::Duration::from_secs(e.duration().as_secs())),
-                kind.name(),
-                channel_id
-            ),
-        }
-    } else {
-        format!(
-            "`{}` has not had a recorded use in <#{}> until now.",
-            kind.name(),
-            channel_id
-        )
-    };
-
-    ctx.send(poise::CreateReply::new().content(msg)).await?;
 
     Ok(())
-}
-
-#[derive(sqlx::Type, Copy, Clone, poise::ChoiceParameter)]
-#[sqlx(type_name = "TEXT")]
-#[sqlx(rename_all = "lowercase")]
-pub enum UndefinedBehavior {
-    #[name = "transmute"]
-    Transmute,
-    #[name = "static_mut"]
-    StaticMut,
 }

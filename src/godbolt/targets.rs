@@ -1,5 +1,6 @@
+use crate::{Context, Data, Error, serenity};
+
 use super::GodboltMode;
-use crate::{serenity, Context, Data, Error};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,7 +107,7 @@ async fn update_godbolt_metadata(data: &Data) -> Result<(), Error> {
 
 pub async fn fetch_godbolt_metadata(
     data: &Data,
-) -> impl std::ops::Deref<Target = GodboltMetadata> + '_ {
+) -> impl std::ops::Deref<Target=GodboltMetadata> + '_ {
     // If we encounter an error while updating the targets list, just log it
     if let Err(error) = update_godbolt_metadata(data).await {
         log::error!("failed to update godbolt metadata: {:?}", error);
@@ -176,9 +177,9 @@ impl<'a> From<&'a str> for SemverRanking<'a> {
                 if let Some((major, minor, patch)) = version_triple {
                     Self::Semver(std::cmp::Reverse((major, minor, patch)))
 
-                // Anything that doesn't fit the `X.X.X` format we treat as an alternative
-                // compiler, we list these after beta & nightly but before the many canonical
-                // rustc versions
+                    // Anything that doesn't fit the `X.X.X` format we treat as an alternative
+                    // compiler, we list these after beta & nightly but before the many canonical
+                    // rustc versions
                 } else {
                     Self::Compiler(semver)
                 }
@@ -188,7 +189,12 @@ impl<'a> From<&'a str> for SemverRanking<'a> {
 }
 
 /// Lists all available godbolt rustc targets
-#[poise::command(prefix_command, slash_command, broadcast_typing, category = "Godbolt")]
+#[poise::command(
+prefix_command,
+slash_command,
+broadcast_typing,
+category = "Godbolt",
+)]
 pub async fn targets(ctx: Context<'_>) -> Result<(), Error> {
     let mut targets = fetch_godbolt_metadata(ctx.data()).await.targets.clone();
 
@@ -210,7 +216,7 @@ pub async fn targets(ctx: Context<'_>) -> Result<(), Error> {
                 })),
         ),
     )
-    .await?;
+        .await?;
 
     Ok(())
 }

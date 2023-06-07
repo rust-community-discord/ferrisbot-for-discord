@@ -1,7 +1,7 @@
-use crate::{serenity, Context, Error};
-
 use reqwest::header;
 use serde::Deserialize;
+
+use crate::{Context, Error, serenity};
 
 const USER_AGENT: &str = "kangalioo/rustbot";
 
@@ -9,12 +9,14 @@ const USER_AGENT: &str = "kangalioo/rustbot";
 struct Crates {
     crates: Vec<Crate>,
 }
+
 #[derive(Debug, Deserialize)]
 struct Crate {
     name: String,
     // newest_version: String, // https://github.com/kangalioo/rustbot/issues/23
     max_version: Option<String>,
-    max_stable_version: Option<String>, // sometimes null empirically
+    max_stable_version: Option<String>,
+    // sometimes null empirically
     updated_at: String,
     downloads: u64,
     description: Option<String>,
@@ -49,7 +51,7 @@ async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate, Error> 
             "Crate `{}` not found. Did you mean `{}`?",
             query, crate_.name
         )
-        .into())
+            .into())
     }
 }
 
@@ -71,7 +73,7 @@ fn format_number(mut n: u64) -> String {
     output
 }
 
-async fn autocomplete_crate(ctx: Context<'_>, partial: &str) -> impl Iterator<Item = String> {
+async fn autocomplete_crate(ctx: Context<'_>, partial: &str) -> impl Iterator<Item=String> {
     let http = &ctx.data().http;
 
     let response = http
@@ -99,12 +101,12 @@ async fn autocomplete_crate(ctx: Context<'_>, partial: &str) -> impl Iterator<It
 /// ?crate crate_name
 /// ```
 #[poise::command(
-    prefix_command,
-    rename = "crate",
-    broadcast_typing,
-    track_edits,
-    slash_command,
-    category = "Crates"
+prefix_command,
+rename = "crate",
+broadcast_typing,
+track_edits,
+slash_command,
+category = "Crates"
 )]
 pub async fn crate_(
     ctx: Context<'_>,
@@ -142,7 +144,7 @@ pub async fn crate_(
                 .color(crate::EMBED_COLOR),
         ),
     )
-    .await?;
+        .await?;
 
     Ok(())
 }
@@ -176,6 +178,7 @@ fn rustc_crate_link(crate_name: &str) -> Option<&'static str> {
         _ => None,
     }
 }
+
 /// Lookup documentation
 ///
 /// Retrieve documentation for a given crate
@@ -183,12 +186,12 @@ fn rustc_crate_link(crate_name: &str) -> Option<&'static str> {
 /// ?docs crate_name::module::item
 /// ```
 #[poise::command(
-    prefix_command,
-    aliases("docs"),
-    broadcast_typing,
-    track_edits,
-    slash_command,
-    category = "Crates"
+prefix_command,
+aliases("docs"),
+broadcast_typing,
+track_edits,
+slash_command,
+category = "Crates"
 )]
 pub async fn doc(
     ctx: Context<'_>,

@@ -2,3 +2,7 @@
 /.env
 /database
 /database.sqlite*
+.*/
+Secrets.toml
+Secrets.dev.toml
+Cargo.lock

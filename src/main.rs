@@ -1,12 +1,12 @@
-mod crates;
-mod godbolt;
-mod misc;
-mod moderation;
-mod playground;
-mod prefixes;
-mod showcase;
-
 use poise::serenity_prelude as serenity;
+use shuttle_poise::ShuttlePoise;
+use shuttle_secrets::SecretStore;
+
+pub mod crates;
+pub mod godbolt;
+pub mod misc;
+pub mod moderation;
+pub mod playground;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -18,11 +18,13 @@ const EMBED_COLOR: (u8, u8, u8) = (0xb7, 0x47, 0x00); // slightly less saturated
 /// If the return value is empty, returns " " instead, because Discord displays those better in
 /// a code block than "".
 fn merge_output_and_errors<'a>(output: &'a str, errors: &'a str) -> std::borrow::Cow<'a, str> {
+    let empty_line_for_spacing: &'static str = "{}\n\n{}";
+
     match (output.trim(), errors.trim()) {
         ("", "") => " ".into(),
         (output, "") => output.into(),
         ("", errors) => errors.into(),
-        (output, errors) => format!("{}\n\n{}", errors, output).into(), // one empty line of spacing
+        (output, errors) => format!(empty_line_for_spacing, errors, output).into(),
     }
 }
 
@@ -84,7 +86,7 @@ code here
     }
 }
 
-async fn listener(ctx: &serenity::Context, event: &poise::Event, data: &Data) -> Result<(), Error> {
+async fn event_handler(ctx: &serenity::Context, event: &poise::Event, data: &Data) -> Result<(), Error> {
     match event {
         poise::Event::MessageUpdate { event, .. } => {
             showcase::try_update_showcase_message(ctx, data, event.id).await?
@@ -101,9 +103,9 @@ async fn listener(ctx: &serenity::Context, event: &poise::Event, data: &Data) ->
             let _: Result<_, _> = ctx
                 .http
                 .add_member_role(
-                    new_member.guild_id,
-                    new_member.user.id,
-                    data.rustacean_role,
+                    new_member.guild_id.0,
+                    new_member.user.id.0,
+                    data.rustacean_role.0,
                     Some(&format!(
                         "Automatically rustified after {} minutes",
                         RUSTIFICATION_DELAY
@@ -117,204 +119,26 @@ async fn listener(ctx: &serenity::Context, event: &poise::Event, data: &Data) ->
     Ok(())
 }
 
-#[derive(Clone, Debug)]
-pub struct ActiveSlowmode {
-    previous_slowmode_rate: u64,
-    duration: u64,
-    rate: u64,
-    /// The slowmode command verifies this value after the sleep and before the slowdown lift,
-    /// to make sure that no new slowmode command has been invoked since
-    invocation_time: chrono::DateTime<chrono::Utc>,
-}
 
 #[derive(Debug)]
 pub struct Data {
     bot_user_id: serenity::UserId,
-    #[allow(dead_code)] // might add back in
     mod_role_id: serenity::RoleId,
     rustacean_role: serenity::RoleId,
-    reports_channel: Option<serenity::ChannelId>,
-    showcase_channel: serenity::ChannelId,
     beginner_channel: serenity::ChannelId,
     bot_start_time: std::time::Instant,
     http: reqwest::Client,
-    database: sqlx::SqlitePool,
     godbolt_metadata: std::sync::Mutex<godbolt::GodboltMetadata>,
-    active_slowmodes:
-        std::sync::Mutex<std::collections::HashMap<serenity::ChannelId, ActiveSlowmode>>,
 }
 
 fn env_var<T: std::str::FromStr>(name: &str) -> Result<T, Error>
-where
-    T::Err: std::fmt::Display,
+    where
+        T::Err: std::fmt::Display,
 {
     Ok(std::env::var(name)
         .map_err(|_| format!("Missing {}", name))?
         .parse()
         .map_err(|e| format!("Invalid {}: {}", name, e))?)
-}
-
-async fn app() -> Result<(), Error> {
-    let discord_token = env_var::<String>("DISCORD_TOKEN")?;
-    let mod_role_id = env_var("MOD_ROLE_ID")?;
-    let rustacean_role = env_var("RUSTACEAN_ROLE_ID")?;
-    let reports_channel = env_var("REPORTS_CHANNEL_ID").ok();
-    let showcase_channel = env_var("SHOWCASE_CHANNEL_ID")?;
-    let beginner_channel = env_var("BEGINNER_CHANNEL_ID")?;
-    let database_url = env_var::<String>("DATABASE_URL")?;
-    let custom_prefixes = env_var("CUSTOM_PREFIXES")?;
-
-    let mut options = poise::FrameworkOptions {
-        commands: vec![
-            playground::play(),
-            playground::playwarn(),
-            playground::eval(),
-            playground::miri(),
-            playground::expand(),
-            playground::clippy(),
-            playground::fmt(),
-            playground::microbench(),
-            playground::procmacro(),
-            godbolt::godbolt(),
-            godbolt::mca(),
-            godbolt::llvmir(),
-            godbolt::targets(),
-            crates::crate_(),
-            crates::doc(),
-            moderation::cleanup(),
-            moderation::ban(),
-            moderation::move_(),
-            moderation::slowmode(),
-            showcase::showcase(),
-            misc::go(),
-            misc::source(),
-            misc::help(),
-            misc::register(),
-            misc::uptime(),
-            misc::servers(),
-            misc::revision(),
-            misc::conradluget(),
-            misc::ub(),
-        ],
-        prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some("?".into()),
-            additional_prefixes: vec![
-                poise::Prefix::Literal("🦀 "),
-                poise::Prefix::Literal("🦀"),
-                poise::Prefix::Literal("<:ferris:358652670585733120> "),
-                poise::Prefix::Literal("<:ferris:358652670585733120>"),
-                poise::Prefix::Regex(
-                    "(yo|hey) (crab|ferris|fewwis),? can you (please |pwease )?"
-                        .parse()
-                        .unwrap(),
-                ),
-            ],
-            edit_tracker: Some(poise::EditTracker::for_timespan(
-                std::time::Duration::from_secs(3600 * 24 * 2),
-            )),
-            stripped_dynamic_prefix: if custom_prefixes {
-                Some(|ctx, msg, data| Box::pin(prefixes::try_strip_prefix(ctx, msg, data)))
-            } else {
-                None
-            },
-            ..Default::default()
-        },
-        pre_command: |ctx| {
-            Box::pin(async move {
-                let channel_name = ctx
-                    .channel_id()
-                    .name(&ctx.discord())
-                    .await
-                    .unwrap_or_else(|_| "<unknown>".to_owned());
-                let author = ctx.author().tag();
-
-                match ctx {
-                    poise::Context::Prefix(ctx) => {
-                        log::info!("{} in {}: {}", author, channel_name, &ctx.msg.content);
-                    }
-                    poise::Context::Application(ctx) => {
-                        let command_name = &ctx.interaction.data().name;
-
-                        log::info!(
-                            "{} in {} used slash command '{}'",
-                            author,
-                            channel_name,
-                            command_name
-                        );
-                    }
-                }
-            })
-        },
-        on_error: |error| Box::pin(on_error(error)),
-        listener: |ctx, event, _framework, data| Box::pin(listener(ctx, event, data)),
-        ..Default::default()
-    };
-
-    if custom_prefixes {
-        options.commands.push(poise::Command {
-            subcommands: vec![
-                prefixes::prefix_add(),
-                prefixes::prefix_remove(),
-                prefixes::prefix_list(),
-                prefixes::prefix_reset(),
-            ],
-            ..prefixes::prefix()
-        });
-    }
-
-    // Use different implementations for rustify because of different feature sets
-    let application_rustify = moderation::application_rustify();
-    options.commands.push(poise::Command {
-        context_menu_action: application_rustify.context_menu_action,
-        slash_action: application_rustify.slash_action,
-        context_menu_name: application_rustify.context_menu_name,
-        parameters: application_rustify.parameters,
-        ..moderation::rustify()
-    });
-
-    if reports_channel.is_some() {
-        options.commands.push(moderation::report());
-    }
-
-    let database = sqlx::sqlite::SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect_with(
-            database_url
-                .parse::<sqlx::sqlite::SqliteConnectOptions>()?
-                .create_if_missing(true),
-        )
-        .await?;
-    sqlx::migrate!("./migrations").run(&database).await?;
-
-    poise::Framework::builder()
-        .token(discord_token)
-        .user_data_setup(move |ctx, bot, _framework| {
-            Box::pin(async move {
-                ctx.set_activity(Some(serenity::ActivityData::listening("?help")));
-                Ok(Data {
-                    bot_user_id: bot.user.id,
-                    mod_role_id,
-                    rustacean_role,
-                    reports_channel,
-                    showcase_channel,
-                    beginner_channel,
-                    bot_start_time: std::time::Instant::now(),
-                    http: reqwest::Client::new(),
-                    database,
-                    godbolt_metadata: std::sync::Mutex::new(godbolt::GodboltMetadata::default()),
-                    active_slowmodes: std::sync::Mutex::new(std::collections::HashMap::new()),
-                })
-            })
-        })
-        .options(options)
-        .intents(
-            serenity::GatewayIntents::non_privileged()
-                | serenity::GatewayIntents::GUILD_MEMBERS
-                | serenity::GatewayIntents::MESSAGE_CONTENT,
-        )
-        .run()
-        .await?;
-    Ok(())
 }
 
 async fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<serenity::Emoji> {
@@ -377,7 +201,7 @@ async fn acknowledge_success(
 async fn trim_text(
     mut text_body: &str,
     text_end: &str,
-    truncation_msg_future: impl std::future::Future<Output = String>,
+    truncation_msg_future: impl std::future::Future<Output=String>,
 ) -> String {
     const MAX_OUTPUT_LINES: usize = 45;
 
@@ -432,20 +256,174 @@ async fn reply_potentially_long_text(
     ctx: Context<'_>,
     text_body: &str,
     text_end: &str,
-    truncation_msg_future: impl std::future::Future<Output = String>,
+    truncation_msg_future: impl std::future::Future<Output=String>,
 ) -> Result<(), Error> {
     ctx.say(trim_text(text_body, text_end, truncation_msg_future).await)
         .await?;
     Ok(())
 }
 
-#[tokio::main]
-async fn main() {
-    let _ = dotenv::dotenv();
+#[shuttle_runtime::main]
+async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> ShuttlePoise<Data, Error> {
     env_logger::init();
 
-    if let Err(e) = app().await {
-        log::error!("{}", e);
-        std::process::exit(1);
+    let data = Data::new(&secret_store);
+
+    let discord_token = env_var::<String>("DISCORD_TOKEN")?;
+    let mod_role_id = env_var("MOD_ROLE_ID")?;
+    let rustacean_role = env_var("RUSTACEAN_ROLE_ID")?;
+    let reports_channel = env_var("REPORTS_CHANNEL_ID").ok();
+    let showcase_channel = env_var("SHOWCASE_CHANNEL_ID")?;
+    let beginner_channel = env_var("BEGINNER_CHANNEL_ID")?;
+    let database_url = env_var::<String>("DATABASE_URL")?;
+    let custom_prefixes = env_var("CUSTOM_PREFIXES")?;
+
+    let framework = poise::Framework::builder()
+        .token(secret_store.get("DISCORD_TOKEN").unwrap())
+        .setup(move |ctx, ready, f| {
+            Box::pin(async move {
+                poise::builtins::register_in_guild(ctx, &f.options().commands, serenity::GuildId(data.discord_guild)).await?;
+                ctx.set_activity(serenity::ActivityData::listening("/help"));
+                Ok(Data {
+                    bot_user_id: bot.user.id,
+                    mod_role_id,
+                    rustacean_role,
+                    beginner_channel,
+                    bot_start_time: std::time::Instant::now(),
+                    http: reqwest::Client::new(),
+                    godbolt_metadata: std::sync::Mutex::new(godbolt::GodboltMetadata::default()),
+                })
+            })
+        })
+        .options(poise::FrameworkOptions {
+            commands: vec![
+                playground::play(),
+                playground::playwarn(),
+                playground::eval(),
+                playground::miri(),
+                playground::expand(),
+                playground::clippy(),
+                playground::fmt(),
+                playground::microbench(),
+                playground::procmacro(),
+                godbolt::godbolt(),
+                godbolt::mca(),
+                godbolt::llvmir(),
+                godbolt::targets(),
+                crates::crate_(),
+                crates::doc(),
+                moderation::cleanup(),
+                moderation::ban(),
+                moderation::move_(),
+                misc::go(),
+                misc::source(),
+                misc::help(),
+                misc::register(),
+                misc::uptime(),
+                misc::conradluget(),
+            ],
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: Some("?".into()),
+                additional_prefixes: vec![
+                    poise::Prefix::Literal("🦀 "),
+                    poise::Prefix::Literal("🦀"),
+                    poise::Prefix::Literal("<:ferris:358652670585733120> "),
+                    poise::Prefix::Literal("<:ferris:358652670585733120>"),
+                    poise::Prefix::Regex(
+                        "(yo|hey) (crab|ferris|fewwis),? can you (please |pwease )?"
+                            .parse()
+                            .unwrap(),
+                    ),
+                ],
+                edit_tracker: Some(poise::EditTracker::for_timespan(
+                    std::time::Duration::from_days(2),
+                )),
+                ..Default::default()
+            },
+            /// The global error handler for all error cases that may occur
+            on_error: |error| Box::pin(on_error(error)),
+            /// This code is run before every command
+            pre_command: |ctx| {
+                Box::pin(async move {
+                    let channel_name = ctx
+                        .channel_id()
+                        .name(&ctx.discord())
+                        .await
+                        .unwrap_or_else(|_| "<unknown>".to_owned());
+                    let author = ctx.author().tag();
+
+                    match ctx {
+                        poise::Context::Prefix(ctx) => {
+                            log::info!("{} in {}: {}", author, channel_name, &ctx.msg.content);
+                        }
+                        poise::Context::Application(ctx) => {
+                            let command_name = &ctx.interaction.data().name;
+
+                            log::info!(
+                            "{} in {} used slash command '{}'",
+                            author,
+                            channel_name,
+                            command_name
+                        );
+                        }
+                    }
+                })
+            },
+            /// This code is run after a command if it was successful (returned Ok)
+            post_command: |ctx| {
+                Box::pin(async move {
+                    println!("Executed command {}!", ctx.command().qualified_name);
+                })
+            },
+            /// Every command invocation must pass this check to continue execution
+            command_check: Some(|_ctx| {
+                Box::pin(async move {
+                    Ok(true)
+                })
+            }),
+            /// Enforce command checks even for owners (enforced by default)
+            /// Set to true to bypass checks, which is useful for testing
+            skip_checks_for_owners: false,
+            event_handler: |ctx, event, _framework, data| {
+                Box::pin(async move {
+                    event_handler(ctx, event, data)
+                })
+            },
+            ..Default::default()
+        })
+        .intents(
+            serenity::GatewayIntents::all(),
+        )
+        .build()
+        .await
+        .map_err(shuttle_runtime::CustomError::new)?;
+
+
+    if custom_prefixes {
+        options.commands.push(poise::Command {
+            subcommands: vec![
+                prefixes::prefix_add(),
+                prefixes::prefix_remove(),
+                prefixes::prefix_list(),
+                prefixes::prefix_reset(),
+            ],
+            ..prefixes::prefix()
+        });
     }
+
+    // Use different implementations for rustify because of different feature sets
+    let application_rustify = a::application_rustify();
+    options.commands.push(poise::Command {
+        context_menu_action: application_rustify.context_menu_action,
+        slash_action: application_rustify.slash_action,
+        context_menu_name: application_rustify.context_menu_name,
+        parameters: application_rustify.parameters,
+        ..a::rustify()
+    });
+
+    if reports_channel.is_some() {
+        options.commands.push(a::report());
+    }
+
+    Ok(framework.into())
 }
