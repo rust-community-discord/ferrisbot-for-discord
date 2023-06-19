@@ -18,13 +18,11 @@ const EMBED_COLOR: (u8, u8, u8) = (0xb7, 0x47, 0x00); // slightly less saturated
 /// If the return value is empty, returns " " instead, because Discord displays those better in
 /// a code block than "".
 fn merge_output_and_errors<'a>(output: &'a str, errors: &'a str) -> std::borrow::Cow<'a, str> {
-    let empty_line_for_spacing: &'static str = "{}\n\n{}";
-
     match (output.trim(), errors.trim()) {
         ("", "") => " ".into(),
         (output, "") => output.into(),
         ("", errors) => errors.into(),
-        (output, errors) => format!(empty_line_for_spacing, errors, output).into(),
+        (output, errors) => format!("{errors}\n\n{output}").into(),
     }
 }
 
@@ -38,7 +36,7 @@ async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
             poise::Context::Prefix(ctx) => {
                 if let Err(e) = ctx
                     .msg
-                    .react(ctx.discord, serenity::ReactionType::from('❌'))
+                    .react(ctx, serenity::ReactionType::from('❌'))
                     .await
                 {
                     log::warn!("Failed to react with red cross: {}", e);
