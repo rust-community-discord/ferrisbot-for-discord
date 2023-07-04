@@ -2,30 +2,27 @@
 name = "rustbot"
 version = "0.1.0"
 authors = ["kangalioo", "technetos <mrgould93@gmail.com>", "Ivan Dardi <ivanbdardi@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+shuttle-runtime = "0.18.0"
+shuttle-poise = "0.18.0"
+shuttle-secrets = "0.18.0"
+shuttle-shared-db = { version = "0.18.0", features = ["postgres"] }
+poise = "0.5.5"
+anyhow = "1.0"
+tokio = "1.28"
+tracing = "0.1.37"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-log = "0.4.14"
-env_logger = "0.7.1"
-chrono = "0.4.0" # To interact with serenity
-# poise = { path = "../poise", features = ["collector"] }
-poise = "0.3.0"
-tokio = { version = "1.4.0", features = ["rt-multi-thread", "process"] }
-sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "sqlite", "offline"] }
-dotenv = "0.15.0"
+sqlx = { version = "0.6.3", features = ["runtime-tokio-native-tls", "postgres", "macros"] }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 image = { version = "0.24", default-features = false, features = ["png"] } # get a better computer meme rendering
 imageproc = { version = "0.23", default-features = false } # get a better computer meme rendering
 rusttype = { version = "0.9", default-features = false } # interact with imageproc
 once_cell = "1.13"
 humantime = "2.1.0"
 rand = "0.8.5"
-
-[patch.crates-io]
-poise = { git = "https://github.com/kangalioo/poise", branch = "serenity-next" }
-# serenity = { git = "https://github.com/elkowar/serenity", branch = "smaller_send_message" }
