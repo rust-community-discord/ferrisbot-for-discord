@@ -530,6 +530,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrisbot-for-discord"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "humantime",
+ "image",
+ "imageproc",
+ "once_cell",
+ "poise",
+ "rand 0.8.5",
+ "reqwest",
+ "rusttype",
+ "serde",
+ "serde_json",
+ "shuttle-poise",
+ "shuttle-runtime",
+ "shuttle-secrets",
+ "shuttle-shared-db",
+ "sqlx",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "finl_unicode"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1963,30 +1987,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustbot"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "humantime",
- "image",
- "imageproc",
- "once_cell",
- "poise",
- "rand 0.8.5",
- "reqwest",
- "rusttype",
- "serde",
- "serde_json",
- "shuttle-poise",
- "shuttle-runtime",
- "shuttle-secrets",
- "shuttle-shared-db",
- "sqlx",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2274,9 +2274,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-codegen"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d4112fc67e10814ea2846be751097d9b62c3053d28da6000fb65fa5e9cd8b2"
+checksum = "7a0d64f4fcee2c5df205fc577915d2b5cf58cb9fed821225d4dbaa2efc47ec60"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -2286,9 +2286,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-common"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "464ccf6314160372fc4256a3e275f5baa6fa7afd091b7b7c4a5e12718a7e3dcf"
+checksum = "13296902586cc37a2641364dc27b6ce98f184aabc0b04fd9255f31b27ffc8abc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2324,9 +2324,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-poise"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dcce1e3401d3cba28aa50c0b89c5557baa82ae295f8c713b111c9e3579fb20a"
+checksum = "a7ea43feed299c3d0320a4138cfebe0b6aab334f5ac3d9bcc654431bbdb397e8"
 dependencies = [
  "poise",
  "shuttle-runtime",
@@ -2334,9 +2334,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-proto"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f62aa6e400d4affc84f3e4efae7cf29fba021a2090b6b4ac9f60fe601c23da66"
+checksum = "083addd888bfb6abcd888d6b20b5e5fcafc00b166f8211c0dcf4753fede5b70c"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2352,9 +2352,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-runtime"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "801e14a4ba4eec1090631006174d4e885ab64b8656803b0d447a7f13152e78b5"
+checksum = "f5bf2b88fa06af2e48189e933a2b9be139f156727a2e2a5a8993a5e5d13005cb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2377,9 +2377,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-secrets"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "750902f3fb95cc88c1a692ac0fdbc85a6a1bc244b564d32e8098b6082a7d0bb8"
+checksum = "cbfe88a94ca090ab59a85680cee59c363ed4e79150ecdcde93fa623977904914"
 dependencies = [
  "async-trait",
  "serde",
@@ -2388,9 +2388,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-service"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f87bd95e35954c3bad44193e324d6ab6d3a0a359e1f83511c45018baff2470"
+checksum = "3e83ea6415ebbedaef2087d4564ca5ea6aea0351df7cd8afefd22b63f0c610dc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2403,9 +2403,9 @@ dependencies = [
 
 [[package]]
 name = "shuttle-shared-db"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74c4efbb1ab7fb3babdc60cc2446e6072050264c0a9b8bd26607f8f1d3308ca8"
+checksum = "cb5172f5f0d9782e4a5cf4cf4ccc3847043f34e490ea6634b08b8b9c7dae1fbd"
 dependencies = [
  "async-trait",
  "serde",
