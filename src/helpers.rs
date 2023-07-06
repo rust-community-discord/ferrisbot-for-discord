@@ -48,7 +48,7 @@ pub async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
 
 pub async fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<serenity::Emoji> {
 	ctx.guild_id()?
-		.to_guild_cached(&ctx)?
+		.to_guild_cached(ctx)?
 		.emojis
 		.values()
 		.find(|emoji| emoji.name.eq_ignore_ascii_case(emoji_name))

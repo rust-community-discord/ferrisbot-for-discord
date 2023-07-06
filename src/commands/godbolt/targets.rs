@@ -15,18 +15,23 @@ struct GodboltTarget {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct GodboltLibraryVersion {
+	#[allow(unused)]
 	id: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
+#[allow(unused)]
 struct GodboltLibrary {
+	#[allow(unused)]
 	id: String,
+	#[allow(unused)]
 	versions: Vec<GodboltLibraryVersion>,
 }
 
 #[derive(Default, Debug)]
 pub struct GodboltMetadata {
 	targets: Vec<GodboltTarget>,
+	#[allow(unused)]
 	libraries: Vec<GodboltLibrary>,
 	last_update_time: Option<std::time::Instant>,
 }

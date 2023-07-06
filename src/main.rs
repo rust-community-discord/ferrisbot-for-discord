@@ -140,30 +140,27 @@ code here
 				Box::pin(async move {
 					debug!("Got an event in event handler: {:?}", event.name());
 
-					match event {
-						Event::GuildMemberAddition { new_member } => {
-							const RUSTIFICATION_DELAY: u64 = 30; // in minutes
+					if let Event::GuildMemberAddition { new_member } = event {
+						const RUSTIFICATION_DELAY: u64 = 30; // in minutes
 
-							tokio::time::sleep(std::time::Duration::from_secs(
-								RUSTIFICATION_DELAY * 60,
-							))
+						tokio::time::sleep(std::time::Duration::from_secs(
+							RUSTIFICATION_DELAY * 60,
+						))
+						.await;
+
+						// Ignore errors because the user may have left already
+						let _: Result<_, _> = ctx
+							.http
+							.add_member_role(
+								new_member.guild_id.0,
+								new_member.user.id.0,
+								data.rustacean_role.0,
+								Some(&format!(
+									"Automatically rustified after {} minutes",
+									RUSTIFICATION_DELAY
+								)),
+							)
 							.await;
-
-							// Ignore errors because the user may have left already
-							let _: Result<_, _> = ctx
-								.http
-								.add_member_role(
-									new_member.guild_id.0,
-									new_member.user.id.0,
-									data.rustacean_role.0,
-									Some(&format!(
-										"Automatically rustified after {} minutes",
-										RUSTIFICATION_DELAY
-									)),
-								)
-								.await;
-						}
-						_ => {}
 					}
 
 					Ok(())

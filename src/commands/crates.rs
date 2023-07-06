@@ -1,10 +1,11 @@
-use anyhow::anyhow;
+use anyhow::Result;
+use anyhow::{anyhow, bail};
 use reqwest::header;
 use serde::Deserialize;
 use tracing::info;
 
+use crate::serenity;
 use crate::types::Context;
-use crate::{serenity, Error};
 
 const USER_AGENT: &str = "kangalioo/rustbot";
 
@@ -28,7 +29,7 @@ struct Crate {
 }
 
 /// Queries the crates.io crates list for a specific crate
-async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate, Error> {
+async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate> {
 	info!("searching for crate `{}`", query);
 
 	let crate_list = http
@@ -50,12 +51,11 @@ async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate, Error> 
 	if crate_.exact_match {
 		Ok(crate_)
 	} else {
-		Err(anyhow!(
+		bail!(
 			"Crate `{}` not found. Did you mean `{}`?",
 			query,
 			crate_.name
 		)
-		.into())
 	}
 }
 
@@ -116,7 +116,7 @@ pub async fn crate_(
 	#[description = "Name of the searched crate"]
 	#[autocomplete = "autocomplete_crate"]
 	crate_name: String,
-) -> Result<(), Error> {
+) -> Result<()> {
 	if let Some(url) = rustc_crate_link(&crate_name) {
 		ctx.say(url).await?;
 		return Ok(());
@@ -205,7 +205,7 @@ fn rustc_crate_link(crate_name: &str) -> Option<&'static str> {
 pub async fn doc(
 	ctx: Context<'_>,
 	#[description = "Path of the crate and item to lookup"] query: String,
-) -> Result<(), Error> {
+) -> Result<()> {
 	let mut query_iter = query.splitn(2, "::");
 	let first_path_element = query_iter.next().unwrap();
 

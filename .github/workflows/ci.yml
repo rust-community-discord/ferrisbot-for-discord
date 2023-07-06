@@ -12,7 +12,6 @@ jobs:
         name:
           - stable
           - beta
-          - nightly
           - macOS
           - Windows
           - no features
@@ -20,8 +19,6 @@ jobs:
         include:
           - name: beta
             toolchain: beta
-          - name: nightly
-            toolchain: nightly
           - name: macOS
             os: macOS-latest
           - name: Windows
@@ -46,7 +43,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check

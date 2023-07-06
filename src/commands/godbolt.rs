@@ -76,7 +76,7 @@ async fn compile_rust_source(
 	};
 
 	let http_request = http
-		.post(&format!(
+		.post(format!(
 			"https://godbolt.org/api/compiler/{}/compile",
 			request.rustc
 		))
@@ -183,7 +183,7 @@ async fn respond_codeblock(
 			async {
 				format!(
 					"Output too large. Godbolt link: <{}>",
-					save_to_shortlink(&ctx.data().http, &godbolt_request).await,
+					save_to_shortlink(&ctx.data().http, godbolt_request).await,
 				)
 			},
 		)
@@ -324,7 +324,7 @@ pub async fn llvmir(
 	} else {
 		"Note: only public functions (`pub fn`) are shown"
 	};
-	respond_codeblock(ctx, codeblock_lang, &text, &note, &godbolt_request).await?;
+	respond_codeblock(ctx, codeblock_lang, &text, note, &godbolt_request).await?;
 
 	Ok(())
 }

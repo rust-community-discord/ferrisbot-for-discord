@@ -281,7 +281,7 @@ pub async fn send_reply(
 	if let Some(retry_pressed) = response
 		.message()
 		.await?
-		.await_component_interaction(&ctx)
+		.await_component_interaction(ctx)
 		.filter(move |mci: &Arc<MessageComponentInteraction>| mci.data.custom_id == custom_id)
 		.timeout(std::time::Duration::from_secs(600))
 		.await

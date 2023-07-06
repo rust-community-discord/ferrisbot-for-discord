@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, bail, Error};
 use reqwest::header;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::info;
@@ -103,14 +103,17 @@ pub enum ProcessAssembly {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(unused)]
 pub enum CompileTarget {
 	Mir,
 }
 
+#[allow(unused)]
 pub type CompileResponse = FormatResponse;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(unused)]
 pub enum Channel {
 	Stable,
 	Beta,
@@ -125,7 +128,7 @@ impl FromStr for Channel {
 			"stable" => Ok(Channel::Stable),
 			"beta" => Ok(Channel::Beta),
 			"nightly" => Ok(Channel::Nightly),
-			_ => Err(anyhow!("invalid release channel `{}`", s).into()),
+			_ => bail!("invalid release channel `{}`", s),
 		}
 	}
 }
@@ -148,12 +151,13 @@ impl FromStr for Edition {
 			"2015" => Ok(Edition::E2015),
 			"2018" => Ok(Edition::E2018),
 			"2021" => Ok(Edition::E2021),
-			_ => Err(anyhow!("invalid edition `{}`", s).into()),
+			_ => bail!("invalid edition `{}`", s),
 		}
 	}
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
+#[allow(unused)]
 pub enum CrateType {
 	#[serde(rename = "bin")]
 	Binary,
@@ -175,7 +179,7 @@ impl FromStr for Mode {
 		match s {
 			"debug" => Ok(Mode::Debug),
 			"release" => Ok(Mode::Release),
-			_ => Err(anyhow!("invalid compilation mode `{}`", s).into()),
+			_ => bail!("invalid compilation mode `{}`", s),
 		}
 	}
 }
