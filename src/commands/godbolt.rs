@@ -162,6 +162,7 @@ async fn save_to_shortlink(http: &reqwest::Client, req: &GodboltRequest<'_>) -> 
 }
 
 #[derive(PartialEq, Clone, Copy)]
+#[allow(unused)]
 enum GodboltMode {
 	Asm,
 	LlvmIr,
