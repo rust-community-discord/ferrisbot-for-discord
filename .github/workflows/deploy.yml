@@ -1,0 +1,49 @@
+name: "shuttle.rs deploy prod"
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  deploy:
+    runs-on: "ubuntu-latest"
+    environment: "Prod"
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v3
+
+      - name: "Install shuttle.rs CLI"
+        run: |
+          # using cargo-binstall because it is faster to get shuttle-cli binary
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall -y cargo-shuttle
+
+      - name: "Log into shuttle.rs"
+        run: |
+          cargo shuttle login --api-key ${{ secrets.SHUTTLE_DEPLOY_KEY }}
+
+      - name: "Set up cargo cache"
+        uses: Swatinem/rust-cache@v2
+
+      - name: "List cargo executables"
+        run: |
+          ls -lA /home/runner/.cargo/bin
+
+      - name: "Run cargo --list"
+        run: |
+          cargo --list
+
+      - name: "Create Secrets.toml file"
+        run: |
+          echo "# From secret store" >> Secrets.toml
+          echo "DISCORD_TOKEN=\"${{ secrets.DISCORD_TOKEN }}\"" >> Secrets.toml
+          echo "# From env var store" >> Secrets.toml
+          echo "DISCORD_GUILD=\"${{ vars.DISCORD_GUILD }}\"" >> Secrets.toml
+          echo "APPLICATION_ID=\"${{ vars.APPLICATION_ID }}\"" >> Secrets.toml
+          echo "MOD_ROLE_ID=\"${{ vars.MOD_ROLE_ID }}\"" >> Secrets.toml
+          echo "RUSTACEAN_ROLE_ID=\"${{ vars.RUSTACEAN_ROLE_ID }}\"" >> Secrets.toml
+
+      - name: "Deploy to shuttle.rs"
+        run: |
+          cargo shuttle deploy | awk '!/Database URI.*?$/'
