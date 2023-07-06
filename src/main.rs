@@ -28,7 +28,8 @@ async fn poise(
 				)
 				.await?;
 
-				ctx.set_activity(serenity::Activity::listening("/help"));
+				ctx.set_activity(serenity::Activity::listening("/help"))
+					.await;
 				Ok(data)
 			})
 		})
