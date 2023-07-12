@@ -4,6 +4,7 @@ use shuttle_poise::ShuttlePoise;
 use shuttle_secrets::SecretStore;
 use tracing::{debug, info, warn};
 
+pub mod checks;
 pub mod commands;
 pub mod helpers;
 pub mod types;

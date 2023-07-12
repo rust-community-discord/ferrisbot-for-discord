@@ -1,6 +1,5 @@
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::CacheHttp;
 
 use crate::types::Context;
 
@@ -72,27 +71,4 @@ pub async fn ban(
 	))
 	.await?;
 	Ok(())
-}
-
-pub async fn check_is_moderator(ctx: Context<'_>) -> Result<bool, Error> {
-	// Retrieve via HTTP to make sure it's up-to-date
-	let guild = ctx
-		.guild_id()
-		.ok_or(anyhow!("This command only works inside guilds"))?
-		.0;
-
-	let author = &ctx.http().get_member(guild, ctx.author().id.0).await?;
-
-	let user_has_moderator_role = author.roles.contains(&ctx.data().mod_role_id);
-	if user_has_moderator_role {
-		Ok(true)
-	} else {
-		ctx.send(|create_reply| {
-			create_reply
-				.content("This command is only available to moderators")
-				.ephemeral(true)
-		})
-		.await?;
-		Ok(false)
-	}
 }
