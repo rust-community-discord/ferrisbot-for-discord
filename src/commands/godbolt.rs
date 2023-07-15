@@ -225,7 +225,7 @@ pub async fn godbolt(
 	let text =
 		crate::helpers::merge_output_and_errors(&godbolt_result.output, &godbolt_result.stderr);
 	let note = if code.code.contains("pub fn") {
-		"Note: only public functions (`pub fn`) are shown"
+		"Note: only public functions (`pub fn`) are shown\n"
 	} else {
 		""
 	};
