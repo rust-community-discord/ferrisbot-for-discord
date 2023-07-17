@@ -17,7 +17,9 @@ async fn poise(
 		.token(secret_store.get("DISCORD_TOKEN").unwrap())
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = types::Data::new(&secret_store);
+				let modmail_message = commands::modmail::setup_modmail(ctx, 0).await?;
+
+				let data = types::Data::new(&secret_store, modmail_message);
 
 				info!("rustbot logged in as {}", ready.user.name);
 
@@ -25,12 +27,14 @@ async fn poise(
 				poise::builtins::register_in_guild(
 					ctx,
 					&framework.options().commands,
-					data.discord_guild,
+					data.discord_guild_id,
 				)
 				.await?;
 
+				debug!("Setting activity text");
 				ctx.set_activity(serenity::Activity::listening("/help"))
 					.await;
+
 				Ok(data)
 			})
 		})
@@ -141,27 +145,35 @@ code here
 				Box::pin(async move {
 					debug!("Got an event in event handler: {:?}", event.name());
 
-					if let Event::GuildMemberAddition { new_member } = event {
-						const RUSTIFICATION_DELAY: u64 = 30; // in minutes
+					match event {
+						Event::GuildMemberAddition { new_member } => {
+							const RUSTIFICATION_DELAY: u64 = 30; // in minutes
 
-						tokio::time::sleep(std::time::Duration::from_secs(
-							RUSTIFICATION_DELAY * 60,
-						))
-						.await;
-
-						// Ignore errors because the user may have left already
-						let _: Result<_, _> = ctx
-							.http
-							.add_member_role(
-								new_member.guild_id.0,
-								new_member.user.id.0,
-								data.rustacean_role.0,
-								Some(&format!(
-									"Automatically rustified after {} minutes",
-									RUSTIFICATION_DELAY
-								)),
-							)
+							tokio::time::sleep(std::time::Duration::from_secs(
+								RUSTIFICATION_DELAY * 60,
+							))
 							.await;
+
+							// Ignore errors because the user may have left already
+							let _: Result<_, _> = ctx
+								.http
+								.add_member_role(
+									new_member.guild_id.0,
+									new_member.user.id.0,
+									data.rustacean_role.0,
+									Some(&format!(
+										"Automatically rustified after {} minutes",
+										RUSTIFICATION_DELAY
+									)),
+								)
+								.await;
+						}
+						Event::MessageUpdate {
+							old_if_available,
+							new,
+							event,
+						} => {}
+						_ => {}
 					}
 
 					Ok(())

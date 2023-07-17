@@ -53,7 +53,8 @@ You can edit your message to the bot and the bot will edit its response.";
 	prefix_command,
 	slash_command,
 	category = "Miscellaneous",
-	hide_in_help
+	hide_in_help,
+	check = "crate::checks::check_is_moderator"
 )]
 pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
 	poise::builtins::register_application_commands_buttons(ctx).await?;
