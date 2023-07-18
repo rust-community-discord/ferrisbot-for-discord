@@ -43,6 +43,7 @@ jobs:
           echo "APPLICATION_ID=\"${{ vars.APPLICATION_ID }}\"" >> Secrets.toml
           echo "MOD_ROLE_ID=\"${{ vars.MOD_ROLE_ID }}\"" >> Secrets.toml
           echo "RUSTACEAN_ROLE_ID=\"${{ vars.RUSTACEAN_ROLE_ID }}\"" >> Secrets.toml
+          echo "MODMAIL_CHANNEL_ID=\"${{ vars.MODMAIL_CHANNEL_ID }}\"" >> Secrets.toml
 
       - name: "Deploy to shuttle.rs"
         run: |

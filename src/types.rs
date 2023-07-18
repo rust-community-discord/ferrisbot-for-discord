@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context as _, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use poise::serenity_prelude as serenity;
 use shuttle_secrets::SecretStore;
 
@@ -10,14 +10,14 @@ pub struct Data {
 	pub application_id: serenity::UserId,
 	pub mod_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
+	pub modmail_channel_id: serenity::ChannelId,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
 	pub godbolt_metadata: std::sync::Mutex<commands::godbolt::GodboltMetadata>,
-	pub modmail_message: serenity::Message,
 }
 
 impl Data {
-	pub fn new(secret_store: &SecretStore, modmail_message: serenity::Message) -> Result<Self> {
+	pub fn new(secret_store: &SecretStore) -> Result<Self> {
 		Ok(Self {
 			discord_guild_id: secret_store
 				.get("DISCORD_GUILD")
@@ -45,10 +45,16 @@ impl Data {
 				))?
 				.parse::<u64>()?
 				.into(),
+			modmail_channel_id: secret_store
+				.get("MODMAIL_CHANNEL_ID")
+				.ok_or(anyhow!(
+					"Failed to get 'MODMAIL_CHANNEL_ID' from the secret store"
+				))?
+				.parse::<u64>()?
+				.into(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
 			godbolt_metadata: std::sync::Mutex::new(commands::godbolt::GodboltMetadata::default()),
-			modmail_message,
 		})
 	}
 }

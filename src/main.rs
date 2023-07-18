@@ -1,5 +1,6 @@
+use crate::types::Data;
 use anyhow::Error;
-use poise::{serenity_prelude as serenity, Event};
+use poise::serenity_prelude as serenity;
 use shuttle_poise::ShuttlePoise;
 use shuttle_secrets::SecretStore;
 use tracing::{debug, info, warn};
@@ -10,18 +11,16 @@ pub mod helpers;
 pub mod types;
 
 #[shuttle_runtime::main]
-async fn poise(
-	#[shuttle_secrets::Secrets] secret_store: SecretStore,
-) -> ShuttlePoise<types::Data, Error> {
+async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> ShuttlePoise<Data, Error> {
 	let framework = poise::Framework::builder()
-		.token(secret_store.get("DISCORD_TOKEN").unwrap())
+		.token(
+			secret_store
+				.get("DISCORD_TOKEN")
+				.expect("Couldn't find your DISCORD_TOKEN!"),
+		)
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let modmail_message = commands::modmail::setup_modmail(ctx, 0).await?;
-
-				let data = types::Data::new(&secret_store, modmail_message);
-
-				info!("rustbot logged in as {}", ready.user.name);
+				let data = Data::new(&secret_store)?;
 
 				debug!("Registering commands...");
 				poise::builtins::register_in_guild(
@@ -35,6 +34,9 @@ async fn poise(
 				ctx.set_activity(serenity::Activity::listening("/help"))
 					.await;
 
+				// let handle = tokio::spawn(async {}).await?;
+
+				info!("rustbot logged in as {}", ready.user.name);
 				Ok(data)
 			})
 		})
@@ -142,42 +144,7 @@ code here
 			/// Set to true to bypass checks, which is useful for testing
 			skip_checks_for_owners: false,
 			event_handler: |ctx, event, _framework, data| {
-				Box::pin(async move {
-					debug!("Got an event in event handler: {:?}", event.name());
-
-					match event {
-						Event::GuildMemberAddition { new_member } => {
-							const RUSTIFICATION_DELAY: u64 = 30; // in minutes
-
-							tokio::time::sleep(std::time::Duration::from_secs(
-								RUSTIFICATION_DELAY * 60,
-							))
-							.await;
-
-							// Ignore errors because the user may have left already
-							let _: Result<_, _> = ctx
-								.http
-								.add_member_role(
-									new_member.guild_id.0,
-									new_member.user.id.0,
-									data.rustacean_role.0,
-									Some(&format!(
-										"Automatically rustified after {} minutes",
-										RUSTIFICATION_DELAY
-									)),
-								)
-								.await;
-						}
-						Event::MessageUpdate {
-							old_if_available,
-							new,
-							event,
-						} => {}
-						_ => {}
-					}
-
-					Ok(())
-				})
+				Box::pin(async move { event_handler(ctx, event, data).await })
 			},
 			..Default::default()
 		})
@@ -187,4 +154,37 @@ code here
 		.map_err(shuttle_runtime::CustomError::new)?;
 
 	Ok(framework.into())
+}
+
+async fn event_handler(
+	ctx: &serenity::Context,
+	event: &poise::Event<'_>,
+	data: &Data,
+) -> Result<(), Error> {
+	debug!("Got an event in event handler: {:?}", event.name());
+
+	match event {
+		poise::Event::GuildMemberAddition { new_member } => {
+			const RUSTIFICATION_DELAY: u64 = 30; // in minutes
+
+			tokio::time::sleep(std::time::Duration::from_secs(RUSTIFICATION_DELAY * 60)).await;
+
+			// Ignore errors because the user may have left already
+			let _: Result<_, _> = ctx
+				.http
+				.add_member_role(
+					new_member.guild_id.into(),
+					new_member.user.id.into(),
+					data.rustacean_role_id.into(),
+					Some(&format!(
+						"Automatically rustified after {} minutes",
+						RUSTIFICATION_DELAY
+					)),
+				)
+				.await;
+		}
+		_ => {}
+	}
+
+	Ok(())
 }
