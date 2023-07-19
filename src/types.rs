@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Error, Result};
 use poise::serenity_prelude as serenity;
 use shuttle_secrets::SecretStore;
+use std::sync::{Arc, RwLock};
 
 use crate::commands;
 
@@ -11,6 +12,7 @@ pub struct Data {
 	pub mod_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
 	pub modmail_channel_id: serenity::ChannelId,
+	pub modmail_message: Arc<RwLock<Option<serenity::Message>>>,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
 	pub godbolt_metadata: std::sync::Mutex<commands::godbolt::GodboltMetadata>,
@@ -52,6 +54,7 @@ impl Data {
 				))?
 				.parse::<u64>()?
 				.into(),
+			modmail_message: Default::default(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
 			godbolt_metadata: std::sync::Mutex::new(commands::godbolt::GodboltMetadata::default()),

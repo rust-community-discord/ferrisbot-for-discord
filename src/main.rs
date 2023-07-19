@@ -1,3 +1,4 @@
+use crate::commands::modmail::load_or_create_modmail_message;
 use crate::types::Data;
 use anyhow::Error;
 use poise::serenity_prelude as serenity;
@@ -34,7 +35,9 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 				ctx.set_activity(serenity::Activity::listening("/help"))
 					.await;
 
-				// let handle = tokio::spawn(async {}).await?;
+				load_or_create_modmail_message(ctx, &data).await?;
+
+				let background_task_handle = tokio::spawn(async {}).await?;
 
 				info!("rustbot logged in as {}", ready.user.name);
 				Ok(data)
