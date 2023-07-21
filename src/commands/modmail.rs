@@ -137,6 +137,18 @@ pub async fn modmail(
 	Ok(())
 }
 
+#[poise::command(
+	slash_command,
+	ephemeral,
+	category = "Modmail",
+	hide_in_help,
+	check = "crate::checks::check_is_moderator"
+)]
+pub async fn modmail_setup(ctx: Context<'_>) -> Result<(), Error> {
+	load_or_create_modmail_message(ctx, ctx.data()).await?;
+	Ok(())
+}
+
 async fn latest_message_link(ctx: Context<'_>) -> String {
 	let message = ctx
 		.channel_id()
