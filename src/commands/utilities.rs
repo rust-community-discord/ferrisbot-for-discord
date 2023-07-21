@@ -1,9 +1,15 @@
 use anyhow::Error;
+use poise::serenity_prelude as serenity;
 
 use crate::types::Context;
 
 /// Evaluates Go code
-#[poise::command(prefix_command, category = "Miscellaneous", discard_spare_arguments)]
+#[poise::command(
+	prefix_command,
+	slash_command,
+	category = "Utilities",
+	discard_spare_arguments
+)]
 pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
 	use rand::Rng as _;
 	if rand::thread_rng().gen_bool(0.01) {
@@ -15,7 +21,7 @@ pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Links to the bot GitHub repo
-#[poise::command(slash_command, category = "Miscellaneous", discard_spare_arguments)]
+#[poise::command(slash_command, category = "Utilities", discard_spare_arguments)]
 pub async fn source(ctx: Context<'_>) -> Result<(), Error> {
 	ctx.say("https://github.com/rust-community-discord/rustbot")
 		.await?;
@@ -23,7 +29,7 @@ pub async fn source(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Show this menu
-#[poise::command(slash_command, category = "Miscellaneous", track_edits)]
+#[poise::command(slash_command, category = "Utilities", track_edits)]
 pub async fn help(
 	ctx: Context<'_>,
 	#[description = "Specific command to show help about"]
@@ -52,7 +58,7 @@ You can edit your message to the bot and the bot will edit its response.";
 #[poise::command(
 	prefix_command,
 	slash_command,
-	category = "Miscellaneous",
+	category = "Utilities",
 	hide_in_help,
 	check = "crate::checks::check_is_moderator"
 )]
@@ -63,7 +69,7 @@ pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Tells you how long the bot has been up for
-#[poise::command(slash_command, category = "Miscellaneous")]
+#[poise::command(slash_command, category = "Utilities")]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 	let uptime = std::time::Instant::now() - ctx.data().bot_start_time;
 
@@ -85,10 +91,10 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 
 /// Use this joke command to have Conrad Ludgate tell you to get something
 ///
-/// Example: `?conradluget a better computer`
-#[poise::command(slash_command, category = "Miscellaneous", track_edits, hide_in_help)]
+/// Example: `/conradluget a better computer`
+#[poise::command(slash_command, category = "Utilities", track_edits, hide_in_help)]
 pub async fn conradluget(
-	_ctx: Context<'_>,
+	ctx: Context<'_>,
 	#[description = "Get what?"]
 	#[rest]
 	text: String,
@@ -124,12 +130,82 @@ pub async fn conradluget(
 		image::ImageOutputFormat::Png,
 	)?;
 
-	// TODO: fix the below command
-	// ctx.send(
-	// 	poise::CreateReply::new()
-	// 		.attachment(serenity::AttachmentType::from(serenity::CreateEmbed(img_bytes, text + ".png"))),
-	// )
-	// 	.await?;
+	let filename = text + ".png";
 
+	let attachment: serenity::AttachmentType = (&img_bytes[..], filename.as_ref()).into();
+
+	ctx.channel_id()
+		.send_files(ctx, vec![attachment], |message| message)
+		.await?;
+
+	Ok(())
+}
+
+/// Deletes the bot's messages for cleanup
+///
+/// /cleanup [limit]
+///
+/// By default, only the most recent bot message is deleted (limit = 1).
+///
+/// Deletes the bot's messages for cleanup.
+/// You can specify how many messages to look for. Only the 20 most recent messages within the
+/// channel from the last 24 hours can be deleted.
+#[poise::command(
+	slash_command,
+	category = "Utilities",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+pub async fn cleanup(
+	ctx: Context<'_>,
+	#[description = "Number of messages to delete"] num_messages: Option<usize>,
+) -> Result<(), Error> {
+	let num_messages = num_messages.unwrap_or(1);
+
+	let messages_to_delete = ctx
+		.channel_id()
+		.messages(&ctx, |get_messages| get_messages.limit(20))
+		.await?
+		.into_iter()
+		.filter(|msg| {
+			if msg.author.id != ctx.data().application_id {
+				return false;
+			}
+			if (*ctx.created_at() - *msg.timestamp).num_hours() >= 24 {
+				return false;
+			}
+			true
+		})
+		.take(num_messages);
+
+	ctx.channel_id()
+		.delete_messages(&ctx, messages_to_delete)
+		.await?;
+
+	crate::helpers::acknowledge_success(ctx, "rustOk", '👌').await
+}
+
+/// Bans another person
+///
+/// /ban <member> [reason]
+///
+/// Bans another person
+#[poise::command(
+	slash_command,
+	category = "Utilities",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+pub async fn ban(
+	ctx: Context<'_>,
+	#[description = "Banned user"] banned_user: serenity_prelude::Member,
+	#[description = "Ban reason"]
+	#[rest]
+	_reason: Option<String>,
+) -> Result<(), Error> {
+	ctx.say(format!(
+		"Banned user {}  {}",
+		banned_user.user.tag(),
+		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
+	))
+	.await?;
 	Ok(())
 }
