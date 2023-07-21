@@ -1,6 +1,7 @@
 use crate::types::{Context, Data};
 use anyhow::{anyhow, bail, Error};
 use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::Mentionable;
 use tracing::{debug, info};
 
 pub async fn load_or_create_modmail_message(
@@ -65,16 +66,18 @@ The modmail will materialize itself as a private thread under this channel with 
 	Ok(())
 }
 
-/// Discreetly reports a user for breaking the rules
+/// Send a private message to the moderators of the server.
 ///
 /// Call this command in a channel when someone might be breaking the rules, for example by being \
 /// very rude, or starting discussions about divisive topics like politics and religion. Nobody \
 /// will see that you invoked this command.
 ///
-/// Your report, along with a link to the \
-/// channel and its most recent message, will show up in a dedicated reports channel for \
-/// moderators, and it allows them to deal with it much faster than if you were to DM a \
-/// potentially AFK moderator.
+/// You can also use this command whenever you want to ask private questions to the moderator team,
+/// open ban appeals, and generally anything that you need help with.
+///
+/// Your message, along with a link to the channel and its most recent message, will show up in a
+/// dedicated modmail channel for moderators, and it allows them to deal with it much faster than if
+/// you were to DM a potentially AFK moderator.
 ///
 /// You can still always ping the Moderator role if you're comfortable doing so.
 #[poise::command(slash_command, ephemeral, category = "Modmail")]
@@ -84,41 +87,36 @@ pub async fn modmail(
 ) -> Result<(), Error> {
 	load_or_create_modmail_message(ctx, ctx.data()).await?;
 
-	let reports_message = ctx
+	let modmail_message = ctx
 		.data()
 		.modmail_message
 		.read()
 		.await
 		.clone()
-		.ok_or(anyhow!("Reports message somehow ceased to exist"))?;
+		.ok_or(anyhow!("Modmail message somehow ceased to exist"))?;
 
-	let reports_channel = reports_message.channel(ctx).await?;
-
-	let naughty_channel = ctx
+	let modmail_channel = modmail_message
+		.channel(ctx)
+		.await?
 		.guild()
-		.ok_or(anyhow!("This command can only be used in a guild"))?;
+		.ok_or(anyhow!("Modmail channel is not in a guild!"))?;
 
-	let report_name = format!("Report {}", ctx.id() % 10000);
+	let modmail_name = format!("Modmail #{}", ctx.id() % 10000);
 
-	let report_thread = match reports_channel {
-		serenity::Channel::Guild(reports_guild_channel) => {
-			reports_guild_channel
-				.create_private_thread(ctx, |create_thread| create_thread.name(report_name))
-				.await?
-		}
-		_ => bail!("Report thread is not in a guild!"),
-	};
+	let modmail_thread = modmail_channel
+		.create_private_thread(ctx, |create_thread| create_thread.name(modmail_name))
+		.await?;
 
 	let thread_message_content = format!(
-		"Hey <@&{}>, <@{}> sent a report from channel {}: {}\n> {}",
+		"Hey <@&{}>, <@{}> needs help in channel {}: {}\n> {}",
 		ctx.data().mod_role_id,
 		ctx.author().id,
-		naughty_channel.name,
+		ctx.channel_id().mention(),
 		latest_message_link(ctx).await,
 		reason
 	);
 
-	report_thread
+	modmail_thread
 		.send_message(ctx, |create_message| {
 			create_message
 				.content(thread_message_content)
@@ -130,8 +128,11 @@ pub async fn modmail(
 		})
 		.await?;
 
-	ctx.say("Successfully sent report. Thanks for helping to make this community a better place!")
-		.await?;
+	ctx.say(format!(
+		"Successfully sent your message to the moderators. Check out the responses here: {}",
+		modmail_thread.mention()
+	))
+	.await?;
 
 	Ok(())
 }
