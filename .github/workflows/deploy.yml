@@ -47,4 +47,4 @@ jobs:
 
       - name: "Deploy to shuttle.rs"
         run: |
-          cargo shuttle deploy & awk '!/Database URI.*?$/'
+          cargo shuttle deploy | awk '!/Database URI.*?$/'
