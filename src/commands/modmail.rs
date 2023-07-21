@@ -1,48 +1,43 @@
 use crate::types::{Context, Data};
 use anyhow::{anyhow, bail, Error};
 use poise::serenity_prelude as serenity;
-use std::sync::Arc;
+use tracing::{debug, info};
 
 pub async fn load_or_create_modmail_message(
-	ctx: &serenity::Context,
+	http: impl AsRef<serenity::Http>,
 	data: &Data,
 ) -> Result<(), Error> {
-	if Arc::clone(&data.modmail_message)
-		.read()
-		.map_err(|error| error.into_inner())?
-		.is_some()
-	{
-		Ok(())
+	// Do nothing if message already exists in cache
+	if data.modmail_message.read().await.clone().is_some() {
+		debug!("Modmail message already exists on data cache.");
+		return Ok(());
 	}
 
-	let guild = data
+	// Fetch modmail guild channel
+	let modmail_guild_channel = data
 		.modmail_channel_id
-		.to_channel(ctx)
+		.to_channel(http.as_ref())
 		.await?
 		.guild()
 		.ok_or(anyhow!("This command can only be used in a guild"))?;
 
-	// TODO: add try_read() call here to return from cache earlier
+	// Fetch the report message itself
+	let open_report_message = modmail_guild_channel
+		.messages(http.as_ref(), |get_messages| get_messages.limit(1))
+		.await?
+		.get(0)
+		.cloned();
 
-	let modmail_channel = guild
-		.channels
-		.get(data.modmail_channel_id.into())
-		.ok_or(anyhow!("Failed to find modmail channel."))?;
-
-	if let serenity::Channel::Guild(guild_channel) = modmail_channel {
-		let open_report_message = guild_channel
-			.messages(ctx, |get_messages| get_messages.limit(1))
-			.await?
-			.get(0)
-			.cloned();
-
-		let message = if let Some(desired_message) = open_report_message {
-			desired_message
-		} else {
-			guild_channel
-				.send_message(ctx, |create_message| {
+	let message = if let Some(desired_message) = open_report_message {
+		// If it exists, return it
+		desired_message
+	} else {
+		// If it doesn't exist, create one and return it
+		debug!("Creating new modmail message");
+		modmail_guild_channel
+				.send_message(http.as_ref(), |create_message| {
 					create_message.content("\
-This is the Modmail channel. In here, you're able to create modmail reports to reach out to the Moderators about things such as reporting rule breaking, or asking a private question. 
+This is the Modmail channel. In here, you're able to create modmail reports to reach out to the Moderators about things such as reporting rule breaking, or asking a private question.
 
 To open a ticket, either right click the offending message and then \"Apps > Report to Modmail\". Alternatively, click the \"Create new Modmail\" button below (soon).
 
@@ -62,12 +57,12 @@ The modmail will materialize itself as a private thread under this channel with 
 					})
 				})
 				.await?
-		};
-		store_message(ctx, message);
-		Ok(())
-	} else {
-		bail!("Somehow the guild channel isn't a guild channel anymore.");
-	}
+	};
+
+	// Cache the message in the Data struct
+	store_message(data, message).await;
+
+	Ok(())
 }
 
 /// Discreetly reports a user for breaking the rules
@@ -87,15 +82,15 @@ pub async fn report(
 	ctx: Context<'_>,
 	#[description = "What did the user do wrong?"] reason: String,
 ) -> Result<(), Error> {
-	load_or_create_modmail_message(ctx).await?;
+	load_or_create_modmail_message(ctx, ctx.data()).await?;
 
 	let reports_message = ctx
 		.data()
 		.modmail_message
 		.read()
-		.map_err(|error| anyhow!("Error when obtaining reports message lock: {}", error))?
-		.ok_or(anyhow!("Reports message somehow ceased to exist"))?
-		.clone();
+		.await
+		.clone()
+		.ok_or(anyhow!("Reports message somehow ceased to exist"))?;
 
 	let reports_channel = reports_message.channel(ctx).await?;
 
@@ -156,14 +151,8 @@ async fn latest_message_link(ctx: Context<'_>) -> String {
 }
 
 /// It's important to keep this in a function because we're dealing with lifetimes and guard drops.
-async fn store_message(ctx: Context<'_>, message: serenity::Message) -> Result<(), Error> {
-	let mut rwguard = ctx.data().modmail_message.write().map_err(|error| {
-		anyhow!(
-			"Failed to acquire write rights to modmail message cache: {}",
-			error
-		)
-	})?;
-
+async fn store_message(data: &Data, message: serenity::Message) {
+	info!("Storing modlog message on cache.");
+	let mut rwguard = data.modmail_message.write().await;
 	rwguard.get_or_insert(message);
-	Ok(())
 }

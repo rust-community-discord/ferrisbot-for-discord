@@ -37,7 +37,7 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 
 				load_or_create_modmail_message(ctx, &data).await?;
 
-				let background_task_handle = tokio::spawn(async {}).await?;
+				// let background_task_handle = tokio::spawn(async {}).await?;
 
 				info!("rustbot logged in as {}", ready.user.name);
 				Ok(data)
