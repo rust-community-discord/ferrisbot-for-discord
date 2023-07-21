@@ -196,7 +196,7 @@ pub async fn cleanup(
 )]
 pub async fn ban(
 	ctx: Context<'_>,
-	#[description = "Banned user"] banned_user: serenity_prelude::Member,
+	#[description = "Banned user"] banned_user: serenity::Member,
 	#[description = "Ban reason"]
 	#[rest]
 	_reason: Option<String>,

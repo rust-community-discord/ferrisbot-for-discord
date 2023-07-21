@@ -1,5 +1,5 @@
 use crate::types::{Context, Data};
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Mentionable;
 use tracing::{debug, info};
