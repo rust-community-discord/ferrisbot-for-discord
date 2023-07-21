@@ -59,7 +59,7 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 				commands::misc::conradluget(),
 				commands::moderation::cleanup(),
 				commands::moderation::ban(),
-				commands::modmail::report(),
+				commands::modmail::modmail(),
 				commands::playground::play(),
 				commands::playground::playwarn(),
 				commands::playground::eval(),

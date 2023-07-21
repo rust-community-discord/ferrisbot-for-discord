@@ -78,7 +78,7 @@ The modmail will materialize itself as a private thread under this channel with 
 ///
 /// You can still always ping the Moderator role if you're comfortable doing so.
 #[poise::command(slash_command, ephemeral, category = "Modmail")]
-pub async fn report(
+pub async fn modmail(
 	ctx: Context<'_>,
 	#[description = "What did the user do wrong?"] reason: String,
 ) -> Result<(), Error> {
