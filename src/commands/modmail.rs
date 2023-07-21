@@ -50,7 +50,7 @@ The modmail will materialize itself as a private thread under this channel with 
 						create_components.create_action_row(|create_action_row| {
 							create_action_row.create_button(|create_button| {
 								create_button
-									.label("Create New Modmail")
+									.label("Create New Modmail (Not Currently Working)")
 									.style(serenity::ButtonStyle::Primary)
 									.custom_id("rplcs_create_new_modmail")
 							})
@@ -83,7 +83,7 @@ The modmail will materialize itself as a private thread under this channel with 
 #[poise::command(slash_command, ephemeral, category = "Modmail")]
 pub async fn modmail(
 	ctx: Context<'_>,
-	#[description = "What did the user do wrong?"] reason: String,
+	#[description = "What would you like to say?"] user_message: String,
 ) -> Result<(), Error> {
 	load_or_create_modmail_message(ctx, ctx.data()).await?;
 
@@ -113,7 +113,7 @@ pub async fn modmail(
 		ctx.author().id,
 		ctx.channel_id().mention(),
 		latest_message_link(ctx).await,
-		reason
+		user_message
 	);
 
 	modmail_thread
