@@ -104,53 +104,29 @@ pub async fn acknowledge_success(
 /// for example for large code blocks. You will want to truncate the code block contents, but the
 /// finalizing triple backticks (` ` `) should always stay - that's what `text_end` is for.
 pub async fn trim_text(
-	mut text_body: &str,
+	text_body: &str,
 	text_end: &str,
 	truncation_msg_future: impl std::future::Future<Output = String>,
 ) -> String {
 	const MAX_OUTPUT_LINES: usize = 45;
+	const MAX_OUTPUT_LENGTH: usize = 2000;
 
-	// Err with the future inside if no truncation occurs
-	let mut truncation_msg_maybe = Err(truncation_msg_future);
+	let needs_truncating = text_body.len() + text_end.len() > MAX_OUTPUT_LENGTH
+		|| text_body.lines().count() > MAX_OUTPUT_LINES;
 
-	// check Discord's 2000 char message limit first
-	if text_body.len() + text_end.len() > 2000 {
-		let truncation_msg = match truncation_msg_maybe {
-			Ok(msg) => msg,
-			Err(future) => future.await,
-		};
+	if needs_truncating {
+		let truncation_msg = truncation_msg_future.await;
 
-		// This is how long the text body may be at max to conform to Discord's limit
-		let available_space = 2000_usize
-			.saturating_sub(text_end.len())
-			.saturating_sub(truncation_msg.len());
+		// truncate for length
+		let text_body: String = text_body.chars().take(MAX_OUTPUT_LENGTH - truncation_msg.len() - text_end.len()).collect();
 
-		let mut cut_off_point = available_space;
-		while !text_body.is_char_boundary(cut_off_point) {
-			cut_off_point -= 1;
-		}
-
-		text_body = &text_body[..cut_off_point];
-		truncation_msg_maybe = Ok(truncation_msg);
-	}
-
-	// check number of lines
-	let text_body = if text_body.lines().count() > MAX_OUTPUT_LINES {
-		truncation_msg_maybe = Ok(match truncation_msg_maybe {
-			Ok(msg) => msg,
-			Err(future) => future.await,
-		});
-
-		text_body
+		// truncate for lines
+		let text_body = text_body
 			.lines()
 			.take(MAX_OUTPUT_LINES)
 			.collect::<Vec<_>>()
-			.join("\n")
-	} else {
-		text_body.to_owned()
-	};
-
-	if let Ok(truncation_msg) = truncation_msg_maybe {
+			.join("\n");
+		
 		format!("{}{}{}", text_body, text_end, truncation_msg)
 	} else {
 		format!("{}{}", text_body, text_end)
