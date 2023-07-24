@@ -203,7 +203,7 @@ pub async fn ban(
 ) -> Result<(), Error> {
 	ctx.say(format!(
 		"Banned user {}  {}",
-		banned_user.user.tag(),
+		banned_user.user.name,
 		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
 	))
 	.await?;
