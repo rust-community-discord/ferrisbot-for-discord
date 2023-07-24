@@ -28,7 +28,7 @@ pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
 	discard_spare_arguments
 )]
 pub async fn source(ctx: Context<'_>) -> Result<(), Error> {
-	ctx.say("https://github.com/rust-community-discord/rustbot")
+	ctx.say("https://github.com/rust-community-discord/ferrisbot-for-discord")
 		.await?;
 	Ok(())
 }
