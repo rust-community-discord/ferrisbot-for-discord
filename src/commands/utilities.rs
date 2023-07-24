@@ -167,13 +167,8 @@ pub async fn cleanup(
 		.await?
 		.into_iter()
 		.filter(|msg| {
-			if msg.author.id != ctx.data().application_id {
-				return false;
-			}
-			if (*ctx.created_at() - *msg.timestamp).num_hours() >= 24 {
-				return false;
-			}
-			true
+			(msg.author.id == ctx.data().application_id)
+				&& (*ctx.created_at() - *msg.timestamp).num_hours() < 24
 		})
 		.take(num_messages);
 
