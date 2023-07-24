@@ -80,7 +80,7 @@ The modmail will materialize itself as a private thread under this channel with 
 /// you were to DM a potentially AFK moderator.
 ///
 /// You can still always ping the Moderator role if you're comfortable doing so.
-#[poise::command(slash_command, ephemeral, category = "Modmail")]
+#[poise::command(prefix_command, slash_command, ephemeral, category = "Modmail")]
 pub async fn modmail(
 	ctx: Context<'_>,
 	#[description = "What would you like to say?"] user_message: String,
@@ -138,6 +138,7 @@ pub async fn modmail(
 }
 
 #[poise::command(
+	prefix_command,
 	slash_command,
 	ephemeral,
 	category = "Modmail",
