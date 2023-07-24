@@ -118,7 +118,10 @@ pub async fn trim_text(
 		let truncation_msg = truncation_msg_future.await;
 
 		// truncate for length
-		let text_body: String = text_body.chars().take(MAX_OUTPUT_LENGTH - truncation_msg.len() - text_end.len()).collect();
+		let text_body: String = text_body
+			.chars()
+			.take(MAX_OUTPUT_LENGTH - truncation_msg.len() - text_end.len())
+			.collect();
 
 		// truncate for lines
 		let text_body = text_body
@@ -126,7 +129,7 @@ pub async fn trim_text(
 			.take(MAX_OUTPUT_LINES)
 			.collect::<Vec<_>>()
 			.join("\n");
-		
+
 		format!("{}{}{}", text_body, text_end, truncation_msg)
 	} else {
 		format!("{}{}", text_body, text_end)
