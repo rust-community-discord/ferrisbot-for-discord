@@ -21,15 +21,20 @@ pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Links to the bot GitHub repo
-#[poise::command(slash_command, category = "Utilities", discard_spare_arguments)]
+#[poise::command(
+	prefix_command,
+	slash_command,
+	category = "Utilities",
+	discard_spare_arguments
+)]
 pub async fn source(ctx: Context<'_>) -> Result<(), Error> {
-	ctx.say("https://github.com/rust-community-discord/rustbot")
+	ctx.say("https://github.com/rust-community-discord/ferrisbot-for-discord")
 		.await?;
 	Ok(())
 }
 
 /// Show this menu
-#[poise::command(slash_command, category = "Utilities", track_edits)]
+#[poise::command(prefix_command, slash_command, category = "Utilities", track_edits)]
 pub async fn help(
 	ctx: Context<'_>,
 	#[description = "Specific command to show help about"]
@@ -69,7 +74,7 @@ pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Tells you how long the bot has been up for
-#[poise::command(slash_command, category = "Utilities")]
+#[poise::command(prefix_command, slash_command, category = "Utilities")]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 	let uptime = std::time::Instant::now() - ctx.data().bot_start_time;
 
@@ -92,7 +97,13 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 /// Use this joke command to have Conrad Ludgate tell you to get something
 ///
 /// Example: `/conradluget a better computer`
-#[poise::command(slash_command, category = "Utilities", track_edits, hide_in_help)]
+#[poise::command(
+	prefix_command,
+	slash_command,
+	category = "Utilities",
+	track_edits,
+	hide_in_help
+)]
 pub async fn conradluget(
 	ctx: Context<'_>,
 	#[description = "Get what?"]
@@ -151,6 +162,7 @@ pub async fn conradluget(
 /// You can specify how many messages to look for. Only the 20 most recent messages within the
 /// channel from the last 24 hours can be deleted.
 #[poise::command(
+	prefix_command,
 	slash_command,
 	category = "Utilities",
 	on_error = "crate::helpers::acknowledge_fail"
@@ -167,13 +179,8 @@ pub async fn cleanup(
 		.await?
 		.into_iter()
 		.filter(|msg| {
-			if msg.author.id != ctx.data().application_id {
-				return false;
-			}
-			if (*ctx.created_at() - *msg.timestamp).num_hours() >= 24 {
-				return false;
-			}
-			true
+			(msg.author.id == ctx.data().application_id)
+				&& (*ctx.created_at() - *msg.timestamp).num_hours() < 24
 		})
 		.take(num_messages);
 
@@ -190,6 +197,7 @@ pub async fn cleanup(
 ///
 /// Bans another person
 #[poise::command(
+	prefix_command,
 	slash_command,
 	category = "Utilities",
 	on_error = "crate::helpers::acknowledge_fail"
@@ -203,7 +211,7 @@ pub async fn ban(
 ) -> Result<(), Error> {
 	ctx.say(format!(
 		"Banned user {}  {}",
-		banned_user.user.tag(),
+		banned_user.user.name,
 		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
 	))
 	.await?;
