@@ -1,7 +1,7 @@
-use anyhow::Error;
-use poise::serenity_prelude as serenity;
-
 use crate::types::Context;
+use anyhow::{anyhow, Error};
+use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::Timestamp;
 
 /// Evaluates Go code
 #[poise::command(
@@ -215,5 +215,39 @@ pub async fn ban(
 		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
 	))
 	.await?;
+	Ok(())
+}
+
+/// Self-timeout yourself.
+///
+/// /selftimeout [duration]
+///
+/// Self-timeout yourself.
+/// You can specify how long you want to timeout yourself for.
+#[poise::command(
+	slash_command,
+	category = "Utilities",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+pub async fn selftimeout(
+	ctx: Context<'_>,
+	#[description = "Duration of self-timeout"] duration: Option<i64>,
+) -> Result<(), Error> {
+	let duration = duration.unwrap_or_else(|| 60 * 60).max(0);
+
+	let now = ctx.created_at().unix_timestamp();
+
+	let then = Timestamp::from_unix_timestamp(now + duration)?;
+
+	let mut member = ctx
+		.author_member()
+		.await
+		.ok_or(anyhow!("failed to fetch member"))?
+		.into_owned();
+
+	member
+		.disable_communication_until_datetime(&ctx, then)
+		.await?;
+
 	Ok(())
 }
