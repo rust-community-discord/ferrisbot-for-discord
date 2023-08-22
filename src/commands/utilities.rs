@@ -249,5 +249,13 @@ pub async fn selftimeout(
 		.disable_communication_until_datetime(&ctx, then)
 		.await?;
 
+	ctx.say(format!(
+		"Self-timeout for {}. They'll be able to interact with the server again <t:{}:R>.\
+		If this was a mistake, please contact a moderator or try to enjoy the time off.",
+		ctx.author().name,
+		then.unix_timestamp()
+	))
+	.await?;
+
 	Ok(())
 }
