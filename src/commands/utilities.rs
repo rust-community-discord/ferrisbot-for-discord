@@ -243,7 +243,7 @@ pub async fn selftimeout(
 			return Err(anyhow!("duration must be positive"));
 		}
 
-		minutes + hours * 60
+		(minutes + hours * 60) * 60
 	};
 
 	let now = ctx.created_at().unix_timestamp();
