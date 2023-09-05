@@ -220,10 +220,11 @@ pub async fn ban(
 
 /// Self-timeout yourself.
 ///
-/// /selftimeout [duration]
+/// /selftimeout [duration_in_hours] [duration_in_minutes]
 ///
 /// Self-timeout yourself.
-/// You can specify how long you want to timeout yourself for.
+/// You can specify how long you want to timeout yourself for, either in hours
+/// or in minutes.
 #[poise::command(
 	slash_command,
 	category = "Utilities",
@@ -231,9 +232,19 @@ pub async fn ban(
 )]
 pub async fn selftimeout(
 	ctx: Context<'_>,
-	#[description = "Duration of self-timeout"] duration: Option<i64>,
+	#[description = "Duration of self-timeout in hours"] duration_in_hours: Option<i64>,
+	#[description = "Duration of self-timeout in minutes"] duration_in_minutes: Option<i64>,
 ) -> Result<(), Error> {
-	let duration = duration.unwrap_or_else(|| 60 * 60).max(0);
+	let duration = {
+		let hours = duration_in_hours.unwrap_or(1);
+		let minutes = duration_in_minutes.unwrap_or(0);
+
+		if hours < 0 || minutes < 0 {
+			return Err(anyhow!("duration must be positive"));
+		}
+
+		minutes + hours * 60
+	};
 
 	let now = ctx.created_at().unix_timestamp();
 
@@ -250,7 +261,7 @@ pub async fn selftimeout(
 		.await?;
 
 	ctx.say(format!(
-		"Self-timeout for {}. They'll be able to interact with the server again <t:{}:R>.\
+		"Self-timeout for {}. They'll be able to interact with the server again <t:{}:R>. \
 		If this was a mistake, please contact a moderator or try to enjoy the time off.",
 		ctx.author().name,
 		then.unix_timestamp()
