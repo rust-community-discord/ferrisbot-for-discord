@@ -61,6 +61,8 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 				commands::utilities::ban(),
 				commands::utilities::selftimeout(),
 				commands::modmail::modmail(),
+				commands::modmail::modmail_context_menu_for_message(),
+				commands::modmail::modmail_context_menu_for_user(),
 				commands::modmail::modmail_setup(),
 				commands::playground::play(),
 				commands::playground::playwarn(),
