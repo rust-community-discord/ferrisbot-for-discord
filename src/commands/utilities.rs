@@ -237,7 +237,10 @@ pub async fn selftimeout(
 ) -> Result<(), Error> {
 	let duration = {
 		let hours = duration_in_hours.unwrap_or(0);
-		let minutes = duration_in_minutes.unwrap_or(60);
+		let minutes = duration_in_minutes.unwrap_or(match hours {
+			0 => 60,
+			_ => 0,
+		});
 
 		if hours < 0 || minutes < 0 {
 			return Err(anyhow!("duration must be positive"));
