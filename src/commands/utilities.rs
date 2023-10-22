@@ -232,8 +232,8 @@ pub async fn ban(
 )]
 pub async fn selftimeout(
 	ctx: Context<'_>,
-	#[description = "Duration of self-timeout in hours"] duration_in_hours: Option<i64>,
-	#[description = "Duration of self-timeout in minutes"] duration_in_minutes: Option<i64>,
+	#[description = "Duration of self-timeout in hours"] duration_in_hours: Option<u64>,
+	#[description = "Duration of self-timeout in minutes"] duration_in_minutes: Option<u64>,
 ) -> Result<(), Error> {
 	let total_seconds = match (duration_in_hours, duration_in_minutes) {
 		(None, None) => 3600, // When nothing is specified, default to one hour.
@@ -242,7 +242,7 @@ pub async fn selftimeout(
 
 	let now = ctx.created_at().unix_timestamp();
 
-	let then = Timestamp::from_unix_timestamp(now + total_seconds)?;
+	let then = Timestamp::from_unix_timestamp(now + total_seconds as i64)?;
 
 	let mut member = ctx
 		.author_member()
