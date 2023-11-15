@@ -232,23 +232,17 @@ pub async fn ban(
 )]
 pub async fn selftimeout(
 	ctx: Context<'_>,
-	#[description = "Duration of self-timeout in hours"] duration_in_hours: Option<i64>,
-	#[description = "Duration of self-timeout in minutes"] duration_in_minutes: Option<i64>,
+	#[description = "Duration of self-timeout in hours"] duration_in_hours: Option<u64>,
+	#[description = "Duration of self-timeout in minutes"] duration_in_minutes: Option<u64>,
 ) -> Result<(), Error> {
-	let duration = {
-		let hours = duration_in_hours.unwrap_or(0);
-		let minutes = duration_in_minutes.unwrap_or(60);
-
-		if hours < 0 || minutes < 0 {
-			return Err(anyhow!("duration must be positive"));
-		}
-
-		(minutes + hours * 60) * 60
+	let total_seconds = match (duration_in_hours, duration_in_minutes) {
+		(None, None) => 3600, // When nothing is specified, default to one hour.
+		(hours, minutes) => hours.unwrap_or(0) * 3600 + minutes.unwrap_or(0) * 60,
 	};
 
 	let now = ctx.created_at().unix_timestamp();
 
-	let then = Timestamp::from_unix_timestamp(now + duration)?;
+	let then = Timestamp::from_unix_timestamp(now + total_seconds as i64)?;
 
 	let mut member = ctx
 		.author_member()
