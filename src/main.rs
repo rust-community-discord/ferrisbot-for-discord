@@ -102,11 +102,13 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 						let response = if error.is::<poise::CodeBlockError>() {
 							"\
 Missing code block. Please use the following markdown:
-\\`code here\\`
+`` `code here` ``
 or
-\\`\\`\\`rust
+```ansi
+`\x1b[0m`\x1b[0m`rust
 code here
-\\`\\`\\`"
+`\x1b[0m`\x1b[0m`
+```"
 								.to_owned()
 						} else if let Some(multiline_help) = ctx.command().help_text {
 							format!("**{}**\n{}", error, multiline_help())
