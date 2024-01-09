@@ -98,7 +98,8 @@ pub async fn load_or_create_modmail_message(
 	let modmail_guild_channel = data
 		.modmail_channel_id
 		.to_channel(http.as_ref())
-		.await?
+		.await
+		.map_err(|e| anyhow!(e).context("Cannot enter modmail channel"))?
 		.guild()
 		.ok_or(anyhow!("This command can only be used in a guild"))?;
 
