@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Error, Result};
 use poise::serenity_prelude as serenity;
 use shuttle_secrets::SecretStore;
-use std::sync::Arc;
 
 use crate::commands;
 

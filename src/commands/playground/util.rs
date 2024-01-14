@@ -1,8 +1,7 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::MessageComponentInteraction;
+use serenity::MessageComponentInteraction;
 
 use crate::types::Context;
 use crate::Error;

@@ -1,8 +1,9 @@
-use crate::types::{Context, Data};
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Mentionable;
 use tracing::{debug, info};
+
+use crate::types::{Context, Data};
 
 /// Opens a modmail thread for a message. To use, right click the message that
 /// you want to report, then go to "Apps" > "Open Modmail".

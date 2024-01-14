@@ -1,5 +1,6 @@
-use crate::types::Context;
 use anyhow::{anyhow, Error};
+
+use crate::types::Context;
 
 pub async fn check_is_moderator(ctx: Context<'_>) -> Result<bool, Error> {
 	let author = ctx

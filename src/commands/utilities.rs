@@ -1,7 +1,8 @@
-use crate::types::Context;
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Timestamp;
+
+use crate::types::Context;
 
 /// Evaluates Go code
 #[poise::command(
