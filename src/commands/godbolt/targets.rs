@@ -209,9 +209,9 @@ pub async fn targets(ctx: Context<'_>) -> Result<(), Error> {
 		SemverRanking::from(&*lhs.semver).cmp(&SemverRanking::from(&*rhs.semver))
 	});
 
-	ctx.send(|create_reply| {
-		create_reply.embed(|create_embed| {
-			create_embed
+	ctx.send(
+		poise::CreateReply::default().embed(
+			serenity::CreateEmbed::default()
 				.title("Godbolt Targets")
 				.fields(targets.into_iter().map(|target| {
 					(
@@ -219,9 +219,9 @@ pub async fn targets(ctx: Context<'_>) -> Result<(), Error> {
 						format!("{} (runs on {})", target.name, target.instruction_set),
 						true,
 					)
-				}))
-		})
-	})
+				})),
+		),
+	)
 	.await?;
 
 	Ok(())

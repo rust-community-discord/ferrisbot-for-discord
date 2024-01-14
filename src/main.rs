@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
-use shuttle_poise::ShuttlePoise;
-use shuttle_secrets::SecretStore;
+use shuttle_runtime::SecretStore;
+use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
 
 use crate::commands::modmail::load_or_create_modmail_message;
@@ -16,13 +16,13 @@ pub mod helpers;
 pub mod types;
 
 #[shuttle_runtime::main]
-async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> ShuttlePoise<Data, Error> {
+async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> ShuttleSerenity {
+	let token = secret_store
+		.get("DISCORD_TOKEN")
+		.expect("Couldn't find your DISCORD_TOKEN!");
+	let intents = serenity::GatewayIntents::all();
+
 	let framework = poise::Framework::builder()
-		.token(
-			secret_store
-				.get("DISCORD_TOKEN")
-				.expect("Couldn't find your DISCORD_TOKEN!"),
-		)
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
 				let data = Data::new(&secret_store)?;
@@ -36,8 +36,7 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 				.await?;
 
 				debug!("Setting activity text");
-				ctx.set_activity(serenity::Activity::listening("/help"))
-					.await;
+				ctx.set_activity(Some(serenity::ActivityData::listening("/help")));
 
 				load_or_create_modmail_message(ctx, &data).await?;
 
@@ -93,12 +92,12 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 							.unwrap(),
 					),
 				],
-				edit_tracker: Some(poise::EditTracker::for_timespan(
-					std::time::Duration::from_secs(60 * 5), // 5 minutes
-				)),
+				edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
+					Duration::from_secs(60 * 5), // 5 minutes
+				))),
 				..Default::default()
 			},
-			/// The global error handler for all error cases that may occur
+			// The global error handler for all error cases that may occur
 			on_error: |error| {
 				Box::pin(async move {
 					warn!("Encountered error: {:?}", error);
@@ -112,8 +111,8 @@ or
 code here
 \\`\\`\\`"
 								.to_owned()
-						} else if let Some(multiline_help) = ctx.command().help_text {
-							format!("**{}**\n{}", error, multiline_help())
+						} else if let Some(multiline_help) = &ctx.command().help_text {
+							format!("**{}**\n{}", error, multiline_help)
 						} else {
 							error.to_string()
 						};
@@ -121,21 +120,21 @@ code here
 						if let Err(e) = ctx.say(response).await {
 							warn!("{}", e)
 						}
-					} else if let poise::FrameworkError::Command { ctx, error } = error {
+					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
 						if let Err(e) = ctx.say(error.to_string()).await {
 							warn!("{}", e)
 						}
 					}
 				})
 			},
-			/// This code is run before every command
+			// This code is run before every command
 			pre_command: |ctx| {
 				Box::pin(async move {
 					let channel_name = &ctx
 						.channel_id()
 						.name(&ctx)
 						.await
-						.unwrap_or_else(|| "<unknown>".to_owned());
+						.unwrap_or_else(|_| "<unknown>".to_owned());
 					let author = &ctx.author().name;
 
 					info!(
@@ -146,58 +145,60 @@ code here
 					);
 				})
 			},
-			/// This code is run after a command if it was successful (returned Ok)
+			// This code is run after a command if it was successful (returned Ok)
 			post_command: |ctx| {
 				Box::pin(async move {
 					println!("Executed command {}!", ctx.command().qualified_name);
 				})
 			},
-			/// Every command invocation must pass this check to continue execution
+			// Every command invocation must pass this check to continue execution
 			command_check: Some(|_ctx| Box::pin(async move { Ok(true) })),
-			/// Enforce command checks even for owners (enforced by default)
-			/// Set to true to bypass checks, which is useful for testing
+			// Enforce command checks even for owners (enforced by default)
+			// Set to true to bypass checks, which is useful for testing
 			skip_checks_for_owners: false,
 			event_handler: |ctx, event, _framework, data| {
 				Box::pin(async move { event_handler(ctx, event, data).await })
 			},
 			..Default::default()
 		})
-		.intents(serenity::GatewayIntents::all())
-		.build()
-		.await
-		.map_err(shuttle_runtime::CustomError::new)?;
+		.build();
 
-	Ok(framework.into())
+	let client = serenity::ClientBuilder::new(token, intents)
+		.framework(framework)
+		.await
+		.map_err(|e| anyhow!(e))?;
+
+	Ok(client.into())
 }
 
 async fn event_handler(
 	ctx: &serenity::Context,
-	event: &poise::Event<'_>,
+	event: &serenity::FullEvent,
 	data: &Data,
 ) -> Result<(), Error> {
-	debug!("Got an event in event handler: {:?}", event.name());
+	debug!(
+		"Got an event in event handler: {:?}",
+		event.snake_case_name()
+	);
 
-	match event {
-		poise::Event::GuildMemberAddition { new_member } => {
-			const RUSTIFICATION_DELAY: u64 = 30; // in minutes
+	if let serenity::FullEvent::GuildMemberAddition { new_member } = event {
+		const RUSTIFICATION_DELAY: u64 = 30; // in minutes
 
-			tokio::time::sleep(std::time::Duration::from_secs(RUSTIFICATION_DELAY * 60)).await;
+		tokio::time::sleep(std::time::Duration::from_secs(RUSTIFICATION_DELAY * 60)).await;
 
-			// Ignore errors because the user may have left already
-			let _: Result<_, _> = ctx
-				.http
-				.add_member_role(
-					new_member.guild_id.into(),
-					new_member.user.id.into(),
-					data.rustacean_role_id.into(),
-					Some(&format!(
-						"Automatically rustified after {} minutes",
-						RUSTIFICATION_DELAY
-					)),
-				)
-				.await;
-		}
-		_ => {}
+		// Ignore errors because the user may have left already
+		let _: Result<_, _> = ctx
+			.http
+			.add_member_role(
+				new_member.guild_id,
+				new_member.user.id,
+				data.rustacean_role_id,
+				Some(&format!(
+					"Automatically rustified after {} minutes",
+					RUSTIFICATION_DELAY
+				)),
+			)
+			.await;
 	}
 
 	Ok(())
