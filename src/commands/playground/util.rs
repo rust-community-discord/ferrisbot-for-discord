@@ -291,8 +291,7 @@ pub async fn send_reply(
 	} else {
 		// If timed out, just remove the button
 		response
-			// TODO: Add code to remove button
-			.edit(ctx, |create_reply| create_reply)
+			.edit(ctx, |create_reply| create_reply.components(|c| c))
 			.await?;
 	}
 
