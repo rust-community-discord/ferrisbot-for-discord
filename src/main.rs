@@ -81,10 +81,14 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
 					poise::Prefix::Literal("🦀"),
 					poise::Prefix::Literal("<:ferris:358652670585733120> "),
 					poise::Prefix::Literal("<:ferris:358652670585733120>"),
-					poise::Prefix::Literal("<:ferrisballSweat:678714352450142239> "),
-					poise::Prefix::Literal("<:ferrisballSweat:678714352450142239>"),
+					poise::Prefix::Literal("<:sweat:678714352450142239> "),
+					poise::Prefix::Literal("<:sweat:678714352450142239>"),
+					poise::Prefix::Literal("<:owo:678714352450142239> "),
+					poise::Prefix::Literal("<:owo:678714352450142239>"),
+					poise::Prefix::Literal("<:owo:579331467000283136> "),
+					poise::Prefix::Literal("<:owo:579331467000283136>"),
 					poise::Prefix::Regex(
-						"(yo|hey) (crab|ferris|fewwis),? can you (please |pwease )?"
+						"(yo |hey )?(crab|ferris|fewwis),? can you (please |pwease )?"
 							.parse()
 							.unwrap(),
 					),

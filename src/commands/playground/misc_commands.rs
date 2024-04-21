@@ -20,8 +20,12 @@ pub async fn miri(
 	code: poise::CodeBlock,
 ) -> Result<(), Error> {
 	ctx.say(stub_message(ctx)).await?;
-
-	let code = &maybe_wrap(&code.code, ResultHandling::Discard);
+	let code = &maybe_wrapped(
+		&code.code,
+		ResultHandling::Discard,
+		ctx.prefix().contains("sweat"),
+		ctx.prefix().contains("owo"),
+	);
 	let (flags, flag_parse_errors) = parse_flags(flags);
 
 	let mut result: PlayResult = ctx
@@ -142,7 +146,12 @@ pub async fn clippy(
 		// dead_code: https://github.com/kangalioo/rustbot/issues/44
 		// let_unit_value: silence warning about `let _ = { ... }` wrapper that swallows return val
 		"#![allow(dead_code, clippy::let_unit_value)] {}",
-		maybe_wrap(&code.code, ResultHandling::Discard)
+		maybe_wrapped(
+			&code.code,
+			ResultHandling::Discard,
+			ctx.prefix().contains("sweat"),
+			false,
+		)
 	);
 	let (flags, flag_parse_errors) = parse_flags(flags);
 
