@@ -1,8 +1,9 @@
-use crate::types::{Context, Data};
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Mentionable;
 use tracing::{debug, info};
+
+use crate::types::{Context, Data};
 
 /// Opens a modmail thread for a message. To use, right click the message that
 /// you want to report, then go to "Apps" > "Open Modmail".
@@ -85,7 +86,7 @@ pub async fn modmail_setup(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 pub async fn load_or_create_modmail_message(
-	http: impl AsRef<serenity::Http>,
+	http: impl serenity::CacheHttp,
 	data: &Data,
 ) -> Result<(), Error> {
 	// Do nothing if message already exists in cache
@@ -97,16 +98,16 @@ pub async fn load_or_create_modmail_message(
 	// Fetch modmail guild channel
 	let modmail_guild_channel = data
 		.modmail_channel_id
-		.to_channel(http.as_ref())
+		.to_channel(&http)
 		.await?
 		.guild()
 		.ok_or(anyhow!("This command can only be used in a guild"))?;
 
 	// Fetch the report message itself
 	let open_report_message = modmail_guild_channel
-		.messages(http.as_ref(), |get_messages| get_messages.limit(1))
+		.messages(&http, serenity::GetMessages::new().limit(1))
 		.await?
-		.get(0)
+		.first()
 		.cloned();
 
 	let message = if let Some(desired_message) = open_report_message {
@@ -116,28 +117,24 @@ pub async fn load_or_create_modmail_message(
 		// If it doesn't exist, create one and return it
 		debug!("Creating new modmail message");
 		modmail_guild_channel
-				.send_message(http.as_ref(), |create_message| {
-					create_message.content("\
+			.send_message(
+				&http,
+				serenity::CreateMessage::new()
+					.content("\
 This is the Modmail channel. In here, you're able to create modmail reports to reach out to the Moderators about things such as reporting rule breaking, or asking a private question.
 
 To open a ticket, either right click the offending message and then \"Apps > Report to Modmail\". Alternatively, click the \"Create new Modmail\" button below (soon).
 
 When creating a rule-breaking report please give a brief description of what is happening along with relevant information, such as members involved, links to offending messages, and a summary of the situation.
 
-The modmail will materialize itself as a private thread under this channel with a random ID. You will be pinged in the thread once the report is opened. Once the report is dealt with, it will be archived"
-					)
-						.components(|create_components| {
-						create_components.create_action_row(|create_action_row| {
-							create_action_row.create_button(|create_button| {
-								create_button
-									.label("Create New Modmail (Not Currently Working)")
-									.style(serenity::ButtonStyle::Primary)
-									.custom_id("rplcs_create_new_modmail")
-							})
-						})
-					})
-				})
-				.await?
+The modmail will materialize itself as a private thread under this channel with a random ID. You will be pinged in the thread once the report is opened. Once the report is dealt with, it will be archived")
+					.button(
+						serenity::CreateButton::new("rplcs_create_new_modmail")
+							.label("Create New Modmail (Not Currently Working)")
+							.style(serenity::ButtonStyle::Primary),
+					),
+			)
+			.await?
 	};
 
 	// Cache the message in the Data struct
@@ -176,26 +173,35 @@ async fn create_modmail_thread(
 	let modmail_name = format!("Modmail #{}", ctx.id() % 10000);
 
 	let modmail_thread = modmail_channel
-		.create_private_thread(ctx, |create_thread| create_thread.name(modmail_name))
+		.create_thread(
+			ctx,
+			serenity::CreateThread::new(modmail_name).kind(serenity::ChannelType::PrivateThread),
+		)
+		.await?;
+
+	// disallow users from inviting others to modmail threads
+	modmail_thread
+		.edit_thread(ctx, |edit_thread| edit_thread.invitable(false))
 		.await?;
 
 	let thread_message_content = format!(
-		"Hey <@&{}>, <@{}> needs help with the following:\n> {}",
-		ctx.data().mod_role_id,
-		ctx.author().id,
+		"Hey {}, {} needs help with the following:\n> {}",
+		ctx.data().mod_role_id.mention(),
+		ctx.author().id.mention(),
 		user_message.into()
 	);
 
 	modmail_thread
-		.send_message(ctx, |create_message| {
-			create_message
+		.send_message(
+			ctx,
+			serenity::CreateMessage::new()
 				.content(thread_message_content)
-				.allowed_mentions(|create_allowed_mentions| {
-					create_allowed_mentions
+				.allowed_mentions(
+					serenity::CreateAllowedMentions::new()
 						.users([ctx.author().id])
-						.roles([ctx.data().mod_role_id])
-				})
-		})
+						.roles([ctx.data().mod_role_id]),
+				),
+		)
 		.await?;
 
 	ctx.say(format!(

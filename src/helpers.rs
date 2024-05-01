@@ -19,7 +19,7 @@ pub fn merge_output_and_errors<'a>(output: &'a str, errors: &'a str) -> std::bor
 /// In prefix commands, react with a red cross emoji. In slash commands, respond with a short
 /// explanation.
 pub async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
-	if let poise::FrameworkError::Command { error, ctx } = error {
+	if let poise::FrameworkError::Command { error, ctx, .. } = error {
 		warn!("Reacting with red cross because of error: {}", error);
 
 		match ctx {
@@ -48,7 +48,7 @@ pub async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
 
 pub async fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<serenity::Emoji> {
 	ctx.guild_id()?
-		.to_guild_cached(ctx)?
+		.to_guild_cached(&ctx)?
 		.emojis
 		.values()
 		.find(|emoji| emoji.name.eq_ignore_ascii_case(emoji_name))
