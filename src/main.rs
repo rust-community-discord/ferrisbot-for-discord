@@ -116,7 +116,7 @@ or
 code here
 `\x1b[0m`\x1b[0m`
 ```"
-								.to_owned()
+							.to_owned()
 						} else if let Some(multiline_help) = &ctx.command().help_text {
 							format!("**{}**\n{}", error, multiline_help)
 						} else {
