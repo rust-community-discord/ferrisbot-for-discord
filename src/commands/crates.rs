@@ -124,9 +124,9 @@ pub async fn crate_(
 
 	let crate_ = get_crate(&ctx.data().http, &crate_name).await?;
 
-	ctx.send(|create_reply| {
-		create_reply.embed(|create_embed| {
-			create_embed
+	ctx.send(
+		poise::CreateReply::default().embed(
+			serenity::CreateEmbed::new()
 				.title(&crate_.name)
 				.url(get_documentation(&crate_))
 				.description(
@@ -150,9 +150,9 @@ pub async fn crate_(
 						.parse::<serenity::Timestamp>()
 						.unwrap_or(serenity::Timestamp::now()),
 				)
-				.color(crate::types::EMBED_COLOR)
-		})
-	})
+				.color(crate::types::EMBED_COLOR),
+		),
+	)
 	.await?;
 
 	Ok(())
