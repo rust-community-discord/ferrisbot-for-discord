@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
+        
+      - name: "Update Rust version"
+        run: "rustup update"
 
       - name: "Install shuttle.rs CLI"
         run: |
