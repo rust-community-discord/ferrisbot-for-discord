@@ -179,10 +179,15 @@ async fn create_modmail_thread(
 		)
 		.await?;
 
+	// disallow users from inviting others to modmail threads
+	modmail_thread
+		.edit_thread(ctx, |edit_thread| edit_thread.invitable(false))
+		.await?;
+
 	let thread_message_content = format!(
-		"Hey <@&{}>, <@{}> needs help with the following:\n> {}",
-		ctx.data().mod_role_id,
-		ctx.author().id,
+		"Hey {}, {} needs help with the following:\n> {}",
+		ctx.data().mod_role_id.mention(),
+		ctx.author().id.mention(),
 		user_message.into()
 	);
 
