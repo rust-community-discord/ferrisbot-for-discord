@@ -12,15 +12,18 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
-        
+
       - name: "Update Rust version"
-        run: "rustup update"
+        run: |
+          rustup update
+          rustc --version
+          cargo --version
 
       - name: "Install shuttle.rs CLI"
         run: |
           # using cargo-binstall because it is faster to get shuttle-cli binary
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall -y cargo-shuttle
+          cargo binstall -y --locked cargo-shuttle
 
       - name: "Log into shuttle.rs"
         run: |
@@ -28,14 +31,6 @@ jobs:
 
       - name: "Set up cargo cache"
         uses: Swatinem/rust-cache@v2
-
-      - name: "List cargo executables"
-        run: |
-          ls -lA /home/runner/.cargo/bin
-
-      - name: "Run cargo --list"
-        run: |
-          cargo --list
 
       - name: "Create Secrets.toml file"
         run: |
