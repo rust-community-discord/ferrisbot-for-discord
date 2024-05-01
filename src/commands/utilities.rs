@@ -1,7 +1,8 @@
-use crate::types::Context;
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Timestamp;
+
+use crate::types::Context;
 
 /// Evaluates Go code
 #[poise::command(
@@ -143,10 +144,10 @@ pub async fn conradluget(
 
 	let filename = text + ".png";
 
-	let attachment: serenity::AttachmentType = (&img_bytes[..], filename.as_ref()).into();
+	let attachment = serenity::CreateAttachment::bytes(img_bytes, filename);
 
 	ctx.channel_id()
-		.send_files(ctx, vec![attachment], |message| message)
+		.send_files(ctx, vec![attachment], serenity::CreateMessage::new())
 		.await?;
 
 	Ok(())
@@ -175,7 +176,7 @@ pub async fn cleanup(
 
 	let messages_to_delete = ctx
 		.channel_id()
-		.messages(&ctx, |get_messages| get_messages.limit(20))
+		.messages(&ctx, serenity::GetMessages::new().limit(20))
 		.await?
 		.into_iter()
 		.filter(|msg| {
