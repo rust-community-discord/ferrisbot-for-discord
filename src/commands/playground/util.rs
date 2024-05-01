@@ -1,8 +1,7 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::MessageComponentInteraction;
+use serenity::ComponentInteraction;
 
 use crate::types::Context;
 use crate::Error;
@@ -260,19 +259,14 @@ pub async fn send_reply(
 	let custom_id = ctx.id().to_string();
 
 	let response = ctx
-		.send(|create_reply| {
-			let mut b = create_reply.content(text);
+		.send({
+			let mut b = poise::CreateReply::default().content(text);
 			if timeout {
-				b = b.components(|create_components| {
-					create_components.create_action_row(|create_action_row| {
-						create_action_row.create_button(|create_button| {
-							create_button
-								.label("Retry")
-								.style(serenity::ButtonStyle::Primary)
-								.custom_id(&custom_id)
-						})
-					})
-				});
+				b = b.components(vec![serenity::CreateActionRow::Buttons(vec![
+					serenity::CreateButton::new(&custom_id)
+						.label("Retry")
+						.style(serenity::ButtonStyle::Primary),
+				])]);
 			}
 			b
 		})
@@ -282,7 +276,7 @@ pub async fn send_reply(
 		.message()
 		.await?
 		.await_component_interaction(ctx)
-		.filter(move |mci: &Arc<MessageComponentInteraction>| mci.data.custom_id == custom_id)
+		.filter(move |mci: &ComponentInteraction| mci.data.custom_id == custom_id)
 		.timeout(std::time::Duration::from_secs(600))
 		.await
 	{
@@ -290,10 +284,11 @@ pub async fn send_reply(
 		ctx.rerun().await?;
 	} else {
 		// If timed out, just remove the button
-		response
+		// Errors are ignored in case the reply was deleted
+		let _ = response
 			// TODO: Add code to remove button
-			.edit(ctx, |create_reply| create_reply)
-			.await?;
+			.edit(ctx, poise::CreateReply::default())
+			.await;
 	}
 
 	Ok(())

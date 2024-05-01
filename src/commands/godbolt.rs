@@ -1,11 +1,10 @@
 use anyhow::{anyhow, Error};
 use tracing::warn;
 
-pub use targets::*;
-
 use crate::types::Context;
 
 mod targets;
+pub use targets::*;
 
 const LLVM_MCA_TOOL_ID: &str = "llvm-mcatrunk";
 
