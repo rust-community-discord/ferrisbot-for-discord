@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::Mentionable;
+use poise::serenity_prelude::{EditThread, Mentionable};
 use tracing::{debug, info};
 
 use crate::types::{Context, Data};
@@ -172,7 +172,7 @@ async fn create_modmail_thread(
 
 	let modmail_name = format!("Modmail #{}", ctx.id() % 10000);
 
-	let modmail_thread = modmail_channel
+	let mut modmail_thread = modmail_channel
 		.create_thread(
 			ctx,
 			serenity::CreateThread::new(modmail_name).kind(serenity::ChannelType::PrivateThread),
@@ -181,7 +181,7 @@ async fn create_modmail_thread(
 
 	// disallow users from inviting others to modmail threads
 	modmail_thread
-		.edit_thread(ctx, |edit_thread| edit_thread.invitable(false))
+		.edit_thread(ctx, EditThread::new().invitable(false))
 		.await?;
 
 	let thread_message_content = format!(
