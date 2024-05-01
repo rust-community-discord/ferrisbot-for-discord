@@ -180,9 +180,9 @@ async fn create_modmail_thread(
 		.await?;
 
 	let thread_message_content = format!(
-		"Hey <@&{}>, <@{}> needs help with the following:\n> {}",
-		ctx.data().mod_role_id,
-		ctx.author().id,
+		"Hey {}, {} needs help with the following:\n> {}",
+		ctx.data().mod_role_id.mention(),
+		ctx.author().id.mention(),
 		user_message.into()
 	);
 
