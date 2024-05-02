@@ -17,8 +17,8 @@ async fn play_or_eval(
 	let code = maybe_wrapped(
 		&code.code,
 		result_handling,
-		ctx.prefix().contains("sweat"),
-		ctx.prefix().contains("owo"),
+		ctx.prefix().contains("Sweat"),
+		ctx.prefix().contains("OwO") || ctx.prefix().contains("Cat"),
 	);
 	let (mut flags, flag_parse_errors) = parse_flags(flags);
 

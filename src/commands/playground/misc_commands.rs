@@ -23,8 +23,8 @@ pub async fn miri(
 	let code = &maybe_wrapped(
 		&code.code,
 		ResultHandling::Discard,
-		ctx.prefix().contains("sweat"),
-		ctx.prefix().contains("owo"),
+		ctx.prefix().contains("Sweat"),
+		ctx.prefix().contains("OwO") || ctx.prefix().contains("Cat"),
 	);
 	let (flags, flag_parse_errors) = parse_flags(flags);
 
@@ -149,7 +149,7 @@ pub async fn clippy(
 		maybe_wrapped(
 			&code.code,
 			ResultHandling::Discard,
-			ctx.prefix().contains("sweat"),
+			ctx.prefix().contains("Sweat"),
 			false,
 		)
 	);
