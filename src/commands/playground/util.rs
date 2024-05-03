@@ -221,7 +221,7 @@ pub fn maybe_wrapped(
 			let stmts = Block::parse_within(input)?;
 			for stmt in &stmts {
 				if let Stmt::Item(Item::Fn(ItemFn { sig, .. })) = stmt {
-					if sig.ident.to_string() == "main" && sig.inputs.len() == 0 {
+					if sig.ident == "main" && sig.inputs.is_empty() {
 						return Err(input.error("main"));
 					}
 				}
