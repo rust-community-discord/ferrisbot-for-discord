@@ -165,6 +165,8 @@ code here
 			event_handler: |ctx, event, _framework, data| {
 				Box::pin(async move { event_handler(ctx, event, data).await })
 			},
+			// Disallow all mentions (except those to the replied user) by default
+			allowed_mentions: Some(serenity::CreateAllowedMentions::new().replied_user(true)),
 			..Default::default()
 		})
 		.build();
