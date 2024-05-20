@@ -86,8 +86,8 @@ async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> Shut
 					poise::Prefix::Literal("<:ferris:358652670585733120>"),
 					poise::Prefix::Literal("<:ferrisballSweat:678714352450142239> "),
 					poise::Prefix::Literal("<:ferrisballSweat:678714352450142239>"),
-					poise::Prefix::Literal("<:ferrisCat:678714352450142239> "),
-					poise::Prefix::Literal("<:ferrisCat:678714352450142239>"),
+					poise::Prefix::Literal("<:ferrisCat:1183779700485664820> "),
+					poise::Prefix::Literal("<:ferrisCat:1183779700485664820>"),
 					poise::Prefix::Literal("<:ferrisOwO:579331467000283136> "),
 					poise::Prefix::Literal("<:ferrisOwO:579331467000283136>"),
 					poise::Prefix::Regex(

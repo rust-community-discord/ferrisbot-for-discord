@@ -247,7 +247,7 @@ pub fn maybe_wrapped(
 	.to_owned();
 
 	if unsf {
-		after_crate_attrs = format!("{unsf}unsafe {{");
+		after_crate_attrs = format!("{after_crate_attrs}unsafe {{");
 	}
 
 	// fn main boilerplate counterpart
