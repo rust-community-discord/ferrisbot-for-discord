@@ -210,6 +210,7 @@ pub fn maybe_wrapped(
 	use quote::quote;
 	use syn::{parse::Parse, *};
 
+	// We use syn to check whether there is a main function.
 	struct Inline {
 		attrs: Vec<Attribute>,
 		stmts: Vec<Stmt>,
@@ -230,36 +231,42 @@ pub fn maybe_wrapped(
 		}
 	}
 
-	let Ok(Inline { attrs, mut stmts }) = parse_str::<Inline>(code) else {
+	let Ok(Inline { .. }) = parse_str::<Inline>(code) else {
 		return Cow::Borrowed(code);
 	};
+
+	// These string subsitutions are not quite optimal, but they perfectly preserve formatting, which is very important.
+	// This function must not change the formatting of the supplied code or it will be confusing and hard to use.
+
+	// fn main boilerplate
+	let mut after_crate_attrs = match result_handling {
+		ResultHandling::None => "fn main() {\n",
+		ResultHandling::Discard => "fn main() { let _ = {\n",
+		ResultHandling::Print => "fn main() { println!(\"{:?}\", {\n",
+	}
+	.to_owned();
+
 	if unsf {
-		stmts = vec![Stmt::Expr(
-			Expr::Unsafe(ExprUnsafe {
-				attrs: vec![],
-				unsafe_token: syn::token::Unsafe::default(),
-				block: Block {
-					brace_token: syn::token::Brace::default(),
-					stmts,
-				},
-			}),
-			None,
-		)];
+		after_crate_attrs = format!("{after_crate_attrs}unsafe {{");
 	}
-	match result_handling {
-		ResultHandling::None => quote! { #(#attrs)* fn main() { #(#stmts)* } },
-		ResultHandling::Discard => {
-			quote! { #(#attrs)* fn main() { _ = (|| { #(#stmts)* })() } }
-		}
-		ResultHandling::Print if pretty => {
-			quote! { #(#attrs)* fn main() { ::std::println!("{:#?}", (|| { #(#stmts)* })()) } }
-		}
-		ResultHandling::Print => {
-			quote! { #(#attrs)* fn main() { ::std::println!("{:?}", (|| { #(#stmts)* })()) } }
-		}
+
+	// fn main boilerplate counterpart
+	let mut after_code = match result_handling {
+		ResultHandling::None => "}",
+		ResultHandling::Discard => "}; }",
+		ResultHandling::Print => "}); }",
 	}
-	.to_string()
-	.into()
+	.to_owned();
+
+	if unsf {
+		after_code = format!("}}{after_code}");
+	}
+
+	Cow::Owned(hoise_crate_attributes(
+		code,
+		&after_crate_attrs,
+		&after_code,
+	))
 }
 
 /// Send a Discord reply with the formatted contents of a Playground result
