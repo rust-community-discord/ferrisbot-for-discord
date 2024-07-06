@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
+use rand::{seq::IteratorRandom, thread_rng, Rng};
 use shuttle_runtime::SecretStore;
 use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
@@ -39,8 +40,6 @@ async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> Shut
 				ctx.set_activity(Some(serenity::ActivityData::listening("/help")));
 
 				load_or_create_modmail_message(ctx, &data).await?;
-
-				// let background_task_handle = tokio::spawn(async {}).await?;
 
 				info!("rustbot logged in as {}", ready.user.name);
 				Ok(data)
@@ -154,7 +153,7 @@ code here
 			// This code is run after a command if it was successful (returned Ok)
 			post_command: |ctx| {
 				Box::pin(async move {
-					println!("Executed command {}!", ctx.command().qualified_name);
+					info!("Executed command {}!", ctx.command().qualified_name);
 				})
 			},
 			// Every command invocation must pass this check to continue execution
@@ -209,5 +208,52 @@ async fn event_handler(
 			.await;
 	}
 
+	if let serenity::FullEvent::Ready { .. } = event {
+		let http = ctx.http.clone();
+		tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
+	}
+
 	Ok(())
+}
+
+async fn init_server_icon_changer(
+	ctx: impl serenity::CacheHttp,
+	guild_id: serenity::GuildId,
+) -> anyhow::Result<()> {
+	let icon_paths = std::fs::read_dir("./assets/server-icons")
+		.map_err(|e| anyhow!("Failed to read server-icons directory: {}", e))?
+		.filter_map(|entry| entry.ok())
+		.filter_map(|entry| {
+			let path = entry.path();
+			if path.is_file() {
+				Some(path)
+			} else {
+				None
+			}
+		})
+		.collect::<Vec<_>>();
+
+	loop {
+		// Attempt to find all images and select one at random
+		let icon = icon_paths.iter().choose(&mut thread_rng());
+		if let Some(icon_path) = icon {
+			info!("Changing server icon to {:?}", icon_path);
+
+			// Attempt to change the server icon
+			let icon_change_result = async {
+				let icon = serenity::CreateAttachment::path(icon_path).await?;
+				let edit_guild = serenity::EditGuild::new().icon(Some(&icon));
+				guild_id.edit(&ctx, edit_guild).await
+			}
+			.await;
+
+			if let Err(e) = icon_change_result {
+				warn!("Failed to change server icon: {}", e);
+			}
+		}
+
+		// Sleep for between 24 and 48 hours
+		let sleep_duration = thread_rng().gen_range((60 * 60 * 24)..(60 * 60 * 48));
+		tokio::time::sleep(Duration::from_secs(sleep_duration)).await;
+	}
 }
