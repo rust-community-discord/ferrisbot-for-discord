@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
-use rand::{seq::IteratorRandom, Rng};
+use rand::{seq::IteratorRandom, thread_rng, Rng};
 use shuttle_runtime::SecretStore;
 use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
@@ -216,49 +216,44 @@ async fn event_handler(
 	Ok(())
 }
 
-async fn init_server_icon_changer(ctx: impl serenity::CacheHttp, guild_id: serenity::GuildId) {
-	let mut interval = tokio::time::interval(Duration::from_secs(
-		rand::thread_rng().gen_range((24 * 60 * 60)..(48 * 60 * 60)),
-	));
+async fn init_server_icon_changer(
+	ctx: impl serenity::CacheHttp,
+	guild_id: serenity::GuildId,
+) -> anyhow::Result<()> {
+	let icon_paths = std::fs::read_dir("./assets/server-icons")
+		.map_err(|e| anyhow!("Failed to read server-icons directory: {}", e))?
+		.filter_map(|entry| entry.ok())
+		.filter_map(|entry| {
+			let path = entry.path();
+			if path.is_file() {
+				Some(path)
+			} else {
+				None
+			}
+		})
+		.collect::<Vec<_>>();
 
 	loop {
 		// Attempt to find all images and select one at random
-		let icon_path_result = std::fs::read_dir("./assets/server-icons")
-			.map_err(|e| anyhow!("Failed to read server-icons directory: {}", e))
-			.and_then(|entries| {
-				entries
-					.filter_map(|entry| entry.ok())
-					.filter_map(|entry| {
-						let path = entry.path();
-						if path.is_file() {
-							Some(path)
-						} else {
-							None
-						}
-					})
-					.choose(&mut rand::thread_rng())
-					.ok_or_else(|| anyhow!("No server icons found"))
-			});
+		let icon = icon_paths.iter().choose(&mut thread_rng());
+		if let Some(icon_path) = icon {
+			info!("Changing server icon to {:?}", icon_path);
 
-		match icon_path_result {
-			Ok(icon_path) => {
-				info!("Changing server icon to {:?}", icon_path);
-
-				// Attempt to change the server icon
-				let icon_change_result = async {
-					let icon = serenity::CreateAttachment::path(icon_path).await?;
-					let builder = serenity::EditGuild::new().icon(Some(&icon));
-					guild_id.edit(&ctx, builder).await
-				}
-				.await;
-
-				if let Err(e) = icon_change_result {
-					warn!("Failed to change server icon: {}", e);
-				}
+			// Attempt to change the server icon
+			let icon_change_result = async {
+				let icon = serenity::CreateAttachment::path(icon_path).await?;
+				let edit_guild = serenity::EditGuild::new().icon(Some(&icon));
+				guild_id.edit(&ctx, edit_guild).await
 			}
-			Err(e) => warn!("{}", e),
+			.await;
+
+			if let Err(e) = icon_change_result {
+				warn!("Failed to change server icon: {}", e);
+			}
 		}
 
-		interval.tick().await;
+		// Sleep for between 24 and 48 hours
+		let sleep_duration = thread_rng().gen_range((60 * 60 * 24)..(60 * 60 * 48));
+		tokio::time::sleep(Duration::from_secs(sleep_duration)).await;
 	}
 }
