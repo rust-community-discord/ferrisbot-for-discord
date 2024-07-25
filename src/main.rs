@@ -66,7 +66,6 @@ async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> Shut
 				commands::modmail::modmail(),
 				commands::modmail::modmail_context_menu_for_message(),
 				commands::modmail::modmail_context_menu_for_user(),
-				commands::modmail::modmail_setup(),
 				commands::playground::play(),
 				commands::playground::playwarn(),
 				commands::playground::eval(),
