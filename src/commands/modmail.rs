@@ -88,19 +88,6 @@ pub async fn modmail(
 	Ok(())
 }
 
-#[poise::command(
-	prefix_command,
-	slash_command,
-	ephemeral,
-	category = "Modmail",
-	hide_in_help,
-	check = "crate::checks::check_is_moderator"
-)]
-pub async fn modmail_setup(ctx: Context<'_>) -> Result<(), Error> {
-	load_or_create_modmail_message(ctx, ctx.data()).await?;
-	Ok(())
-}
-
 pub async fn load_or_create_modmail_message(
 	http: impl serenity::CacheHttp,
 	data: &Data,
