@@ -92,7 +92,7 @@ pub fn generic_help(spec: GenericHelp<'_>) -> String {
 		reply += "- mode: debug, release (default: debug)\n";
 		reply += "- channel: stable, beta, nightly (default: nightly)\n";
 	}
-	reply += "- edition: 2015, 2018, 2021 (default: 2021)\n";
+	reply += "- edition: 2015, 2018, 2021, 2024 (default: 2021)\n";
 	if spec.warn {
 		reply += "- warn: true, false (default: false)\n";
 	}

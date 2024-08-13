@@ -141,6 +141,8 @@ pub enum Edition {
 	E2018,
 	#[serde(rename = "2021")]
 	E2021,
+	#[serde(rename = "2024")]
+	E2024,
 }
 
 impl FromStr for Edition {
@@ -151,6 +153,7 @@ impl FromStr for Edition {
 			"2015" => Ok(Edition::E2015),
 			"2018" => Ok(Edition::E2018),
 			"2021" => Ok(Edition::E2021),
+			"2024" => Ok(Edition::E2024),
 			_ => bail!("invalid edition `{}`", s),
 		}
 	}
@@ -265,6 +268,7 @@ pub fn url_from_gist(flags: &CommandFlags, gist_id: &str) -> String {
 			Edition::E2015 => "2015",
 			Edition::E2018 => "2018",
 			Edition::E2021 => "2021",
+			Edition::E2024 => "2024",
 		},
 		gist_id
 	)
