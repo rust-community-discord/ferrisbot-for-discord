@@ -54,7 +54,6 @@ pub struct FormatRequest<'a> {
 pub struct FormatResponse {
 	pub success: bool,
 	pub code: String,
-	pub stdout: String,
 	pub stderr: String,
 }
 

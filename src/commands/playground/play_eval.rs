@@ -14,12 +14,7 @@ async fn play_or_eval(
 ) -> Result<(), Error> {
 	ctx.say(stub_message(ctx)).await?;
 
-	let code = maybe_wrapped(
-		&code.code,
-		result_handling,
-		ctx.prefix().contains("Sweat"),
-		ctx.prefix().contains("OwO") || ctx.prefix().contains("Cat"),
-	);
+	let code = maybe_wrapped(&code.code, result_handling, ctx.prefix().contains("Sweat"));
 	let (mut flags, flag_parse_errors) = parse_flags(flags);
 
 	if force_warnings {
