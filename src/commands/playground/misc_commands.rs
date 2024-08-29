@@ -24,7 +24,6 @@ pub async fn miri(
 		&code.code,
 		ResultHandling::Discard,
 		ctx.prefix().contains("Sweat"),
-		ctx.prefix().contains("OwO") || ctx.prefix().contains("Cat"),
 	);
 	let (flags, flag_parse_errors) = parse_flags(flags);
 
@@ -150,7 +149,6 @@ pub async fn clippy(
 			&code.code,
 			ResultHandling::Discard,
 			ctx.prefix().contains("Sweat"),
-			false,
 		)
 	);
 	let (flags, flag_parse_errors) = parse_flags(flags);

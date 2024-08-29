@@ -198,27 +198,18 @@ pub fn hoise_crate_attributes(code: &str, after_crate_attrs: &str, after_code: &
 /// To check, whether a wrap was done, check if the return type is Cow::Borrowed vs Cow::Owned
 /// If a wrap was done, also hoists crate attributes to the top so they keep working
 pub fn maybe_wrap(code: &str, result_handling: ResultHandling) -> Cow<str> {
-	maybe_wrapped(code, result_handling, false, false)
+	maybe_wrapped(code, result_handling, false)
 }
 
-pub fn maybe_wrapped(
-	code: &str,
-	result_handling: ResultHandling,
-	unsf: bool,
-	pretty: bool,
-) -> Cow<str> {
-	use quote::quote;
+pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) -> Cow<str> {
 	use syn::{parse::Parse, *};
 
 	// We use syn to check whether there is a main function.
-	struct Inline {
-		attrs: Vec<Attribute>,
-		stmts: Vec<Stmt>,
-	}
+	struct Inline {}
 
 	impl Parse for Inline {
 		fn parse(input: parse::ParseStream) -> Result<Self> {
-			let attrs = Attribute::parse_inner(input)?;
+			Attribute::parse_inner(input)?;
 			let stmts = Block::parse_within(input)?;
 			for stmt in &stmts {
 				if let Stmt::Item(Item::Fn(ItemFn { sig, .. })) = stmt {
@@ -227,7 +218,7 @@ pub fn maybe_wrapped(
 					}
 				}
 			}
-			Ok(Self { attrs, stmts })
+			Ok(Self {})
 		}
 	}
 

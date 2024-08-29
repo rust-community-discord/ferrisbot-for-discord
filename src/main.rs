@@ -1,12 +1,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::commands::modmail;
 use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
 use crate::types::Data;
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::{EditThread, Mentionable};
 use rand::{seq::IteratorRandom, thread_rng, Rng};
 use shuttle_runtime::SecretStore;
 use shuttle_serenity::ShuttleSerenity;
@@ -213,12 +211,14 @@ async fn event_handler(
 		tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
 	}
 
-	if let serenity::FullEvent::InteractionCreate { interaction, .. } = event {
-		if let serenity::Interaction::Component(component) = interaction {
-			if component.data.custom_id == "rplcs_create_new_modmail" {
-				let message = "Created from modmail button";
-				create_modmail_thread(ctx, message, data, component.user.id).await?;
-			}
+	if let serenity::FullEvent::InteractionCreate {
+		interaction: serenity::Interaction::Component(component),
+		..
+	} = event
+	{
+		if component.data.custom_id == "rplcs_create_new_modmail" {
+			let message = "Created from modmail button";
+			create_modmail_thread(ctx, message, data, component.user.id).await?;
 		}
 	}
 

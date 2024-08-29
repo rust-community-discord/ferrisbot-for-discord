@@ -1,4 +1,3 @@
-use crate::commands::modmail;
 use crate::types::{Context, Data};
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;

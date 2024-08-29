@@ -11,7 +11,6 @@ const LLVM_MCA_TOOL_ID: &str = "llvm-mcatrunk";
 struct Compilation {
 	output: String,
 	stderr: String,
-	success: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -35,7 +34,6 @@ impl GodboltOutput {
 
 #[derive(Debug, serde::Deserialize)]
 struct GodboltResponse {
-	code: u8,
 	// stdout: GodboltOutput,
 	stderr: GodboltOutput,
 	asm: GodboltOutput,
@@ -83,7 +81,7 @@ async fn compile_rust_source(
 		.json(&serde_json::json! { {
             "source": request.source_code,
             "options": {
-                "userArguments": format!("{} --color=never", request.flags),
+                "userArguments": request.flags,
                 "tools": tools,
                 // "libraries": [{"id": "itoa", "version": "102"}],
             },
@@ -109,7 +107,6 @@ async fn compile_rust_source(
 			response.asm.concatenate()
 		},
 		stderr: response.stderr.concatenate(),
-		success: response.code == 0,
 	})
 }
 
@@ -228,12 +225,7 @@ pub async fn godbolt(
 	} else {
 		""
 	};
-	let codeblock_lang = if godbolt_result.success {
-		"x86asm"
-	} else {
-		"rust"
-	};
-	respond_codeblock(ctx, codeblock_lang, &text, note, &godbolt_request).await?;
+	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
 
 	Ok(())
 }
@@ -275,7 +267,7 @@ pub async fn mca(
 	} else {
 		"Note: only public functions (`pub fn`) are shown"
 	};
-	respond_codeblock(ctx, "rust", &text, note, &godbolt_request).await?;
+	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
 
 	Ok(())
 }
@@ -313,17 +305,12 @@ pub async fn llvmir(
 
 	let text =
 		crate::helpers::merge_output_and_errors(&godbolt_result.output, &godbolt_result.stderr);
-	let codeblock_lang = if godbolt_result.success {
-		"llvm"
-	} else {
-		"rust"
-	};
 	let note = if code.code.contains("pub fn") {
 		""
 	} else {
 		"Note: only public functions (`pub fn`) are shown"
 	};
-	respond_codeblock(ctx, codeblock_lang, &text, note, &godbolt_request).await?;
+	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
 
 	Ok(())
 }
