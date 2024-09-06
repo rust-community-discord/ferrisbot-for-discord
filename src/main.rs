@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -234,22 +235,34 @@ async fn event_handler(
 	Ok(())
 }
 
+async fn fetch_icon_paths() -> tokio::io::Result<Box<[PathBuf]>> {
+	let mut icon_paths = Vec::new();
+	let mut icon_path_iter = tokio::fs::read_dir("./assets/server-icons").await?;
+	loop {
+		let Ok(entry_opt) = icon_path_iter.next_entry().await else {
+			continue;
+		};
+
+		let Some(entry) = entry_opt else {
+			break;
+		};
+
+		let path = entry.path();
+		if path.is_file() {
+			icon_paths.push(path);
+		}
+	}
+
+	Ok(icon_paths.into())
+}
+
 async fn init_server_icon_changer(
 	ctx: impl serenity::CacheHttp,
 	guild_id: serenity::GuildId,
 ) -> anyhow::Result<()> {
-	let icon_paths = std::fs::read_dir("./assets/server-icons")
-		.map_err(|e| anyhow!("Failed to read server-icons directory: {}", e))?
-		.filter_map(|entry| entry.ok())
-		.filter_map(|entry| {
-			let path = entry.path();
-			if path.is_file() {
-				Some(path)
-			} else {
-				None
-			}
-		})
-		.collect::<Vec<_>>();
+	let icon_paths = fetch_icon_paths()
+		.await
+		.map_err(|e| anyhow!("Failed to read server-icons directory: {e}"))?;
 
 	loop {
 		// Attempt to find all images and select one at random
