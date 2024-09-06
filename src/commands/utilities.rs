@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Timestamp;
@@ -111,8 +113,7 @@ pub async fn conradluget(
 	#[rest]
 	text: String,
 ) -> Result<(), Error> {
-	use once_cell::sync::Lazy;
-	static BASE_IMAGE: Lazy<image::DynamicImage> = Lazy::new(|| {
+	static BASE_IMAGE: LazyLock<image::DynamicImage> = LazyLock::new(|| {
 		image::io::Reader::with_format(
 			std::io::Cursor::new(&include_bytes!("../../assets/conrad.png")[..]),
 			image::ImageFormat::Png,
@@ -120,7 +121,7 @@ pub async fn conradluget(
 		.decode()
 		.expect("failed to load image")
 	});
-	static FONT: Lazy<rusttype::Font> = Lazy::new(|| {
+	static FONT: LazyLock<rusttype::Font> = LazyLock::new(|| {
 		rusttype::Font::try_from_bytes(include_bytes!("../../assets/OpenSans.ttf"))
 			.expect("failed to load font")
 	});
