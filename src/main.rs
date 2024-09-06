@@ -16,16 +16,23 @@ pub mod helpers;
 pub mod types;
 
 #[shuttle_runtime::main]
-async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> ShuttleSerenity {
+async fn serenity(
+	#[shuttle_runtime::Secrets] secret_store: SecretStore,
+	#[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
+) -> ShuttleSerenity {
 	let token = secret_store
 		.get("DISCORD_TOKEN")
 		.expect("Couldn't find your DISCORD_TOKEN!");
-	let intents = serenity::GatewayIntents::all();
+
+	sqlx::migrate!()
+		.run(&pool)
+		.await
+		.expect("Failed to run migrations");
 
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store)?;
+				let data = Data::new(&secret_store, pool)?;
 
 				debug!("Registering commands...");
 				poise::builtins::register_in_guild(
@@ -73,6 +80,7 @@ async fn serenity(#[shuttle_runtime::Secrets] secret_store: SecretStore) -> Shut
 				commands::playground::fmt(),
 				commands::playground::microbench(),
 				commands::playground::procmacro(),
+				commands::tags::tag(),
 			],
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
@@ -167,6 +175,8 @@ code here
 			..Default::default()
 		})
 		.build();
+
+	let intents = serenity::GatewayIntents::all();
 
 	let client = serenity::ClientBuilder::new(token, intents)
 		.framework(framework)

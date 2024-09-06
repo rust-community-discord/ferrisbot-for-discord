@@ -8,6 +8,7 @@ use crate::commands;
 
 #[derive(Debug)]
 pub struct Data {
+	pub database: sqlx::PgPool,
 	pub discord_guild_id: serenity::GuildId,
 	pub application_id: serenity::UserId,
 	pub mod_role_id: serenity::RoleId,
@@ -20,8 +21,9 @@ pub struct Data {
 }
 
 impl Data {
-	pub fn new(secret_store: &SecretStore) -> Result<Self> {
+	pub fn new(secret_store: &SecretStore, database: sqlx::PgPool) -> Result<Self> {
 		Ok(Self {
+			database,
 			discord_guild_id: secret_store
 				.get("DISCORD_GUILD")
 				.ok_or(anyhow!(
