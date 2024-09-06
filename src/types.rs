@@ -57,7 +57,7 @@ impl Data {
 				))?
 				.parse::<u64>()?
 				.into(),
-			modmail_message: Default::default(),
+			modmail_message: Arc::default(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
 			godbolt_metadata: std::sync::Mutex::new(commands::godbolt::GodboltMetadata::default()),

@@ -1,5 +1,12 @@
 #![warn(rust_2018_idioms, clippy::pedantic)]
-#![allow(clippy::too_many_lines)]
+#![allow(
+	clippy::too_many_lines,
+	clippy::missing_errors_doc,
+	clippy::missing_panics_doc,
+	clippy::cast_possible_wrap,
+	clippy::module_name_repetitions,
+	clippy::assigning_clones, // Too many false triggers
+)]
 
 use std::path::PathBuf;
 use std::sync::Arc;

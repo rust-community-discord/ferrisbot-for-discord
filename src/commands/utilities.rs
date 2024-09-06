@@ -118,7 +118,7 @@ pub async fn conradluget(
 		.decode()
 		.expect("failed to load image")
 	});
-	static FONT: LazyLock<rusttype::Font> = LazyLock::new(|| {
+	static FONT: LazyLock<rusttype::Font<'_>> = LazyLock::new(|| {
 		rusttype::Font::try_from_bytes(include_bytes!("../../assets/OpenSans.ttf"))
 			.expect("failed to load font")
 	});
@@ -211,7 +211,7 @@ pub async fn ban(
 	ctx.say(format!(
 		"Banned user {}  {}",
 		banned_user.user.name,
-		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
+		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨')
 	))
 	.await?;
 	Ok(())

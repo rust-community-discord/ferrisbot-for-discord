@@ -47,7 +47,8 @@ pub async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
 	}
 }
 
-pub async fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<serenity::Emoji> {
+#[must_use]
+pub fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<serenity::Emoji> {
 	ctx.guild_id()?
 		.to_guild_cached(&ctx)?
 		.emojis
@@ -56,8 +57,9 @@ pub async fn find_custom_emoji(ctx: Context<'_>, emoji_name: &str) -> Option<ser
 		.cloned()
 }
 
-pub async fn custom_emoji_code(ctx: Context<'_>, emoji_name: &str, fallback: char) -> String {
-	match find_custom_emoji(ctx, emoji_name).await {
+#[must_use]
+pub fn custom_emoji_code(ctx: Context<'_>, emoji_name: &str, fallback: char) -> String {
+	match find_custom_emoji(ctx, emoji_name) {
 		Some(emoji) => emoji.to_string(),
 		None => fallback.to_string(),
 	}
@@ -72,7 +74,7 @@ pub async fn acknowledge_success(
 	emoji_name: &str,
 	fallback: char,
 ) -> Result<(), Error> {
-	let emoji = find_custom_emoji(ctx, emoji_name).await;
+	let emoji = find_custom_emoji(ctx, emoji_name);
 	match ctx {
 		Context::Prefix(prefix_context) => {
 			let reaction = emoji.map_or_else(
@@ -105,6 +107,7 @@ pub async fn acknowledge_success(
 /// Only `text_body` is truncated. `text_end` will always be appended at the end. This is useful
 /// for example for large code blocks. You will want to truncate the code block contents, but the
 /// finalizing triple backticks (` ` `) should always stay - that's what `text_end` is for.
+#[expect(clippy::doc_markdown)] // backticks cause clippy to freak out
 pub async fn trim_text(
 	text_body: &str,
 	text_end: &str,

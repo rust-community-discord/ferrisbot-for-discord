@@ -56,6 +56,7 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	(flags, errors)
 }
 
+#[derive(Clone, Copy)]
 pub struct GenericHelp<'a> {
 	pub command: &'a str,
 	pub desc: &'a str,
@@ -151,6 +152,7 @@ pub fn extract_relevant_lines<'a>(
 	stderr
 }
 
+#[derive(Clone, Copy)]
 pub enum ResultHandling {
 	/// Don't consume results at all, making rustc throw an error when the result isn't ()
 	None,
@@ -197,18 +199,18 @@ pub fn hoise_crate_attributes(code: &str, after_crate_attrs: &str, after_code: &
 /// Utility used by the commands to wrap the given code in a `fn main` if not already wrapped.
 /// To check, whether a wrap was done, check if the return type is `Cow::Borrowed` vs `Cow::Owned`
 /// If a wrap was done, also hoists crate attributes to the top so they keep working
-pub fn maybe_wrap(code: &str, result_handling: ResultHandling) -> Cow<str> {
+pub fn maybe_wrap(code: &str, result_handling: ResultHandling) -> Cow<'_, str> {
 	maybe_wrapped(code, result_handling, false)
 }
 
-pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) -> Cow<str> {
+pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) -> Cow<'_, str> {
 	use syn::{parse, parse::Parse, parse_str, Attribute, Block, Item, ItemFn, Result, Stmt};
 
 	// We use syn to check whether there is a main function.
 	struct Inline {}
 
 	impl Parse for Inline {
-		fn parse(input: parse::ParseStream) -> Result<Self> {
+		fn parse(input: parse::ParseStream<'_>) -> Result<Self> {
 			Attribute::parse_inner(input)?;
 			let stmts = Block::parse_within(input)?;
 			for stmt in &stmts {
@@ -405,7 +407,7 @@ pub fn format_play_eval_stderr(stderr: &str, show_compiler_warnings: bool) -> St
 	}
 }
 
-pub fn stub_message(ctx: Context) -> String {
+pub fn stub_message(ctx: Context<'_>) -> String {
 	let mut stub_message = String::from("_Running code on playground..._\n");
 
 	if let Context::Prefix(ctx) = ctx {
