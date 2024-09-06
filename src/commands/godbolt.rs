@@ -165,6 +165,51 @@ enum GodboltMode {
 	Mca,
 }
 
+fn note(code: &str) -> &'static str {
+	if code.contains("#[no_mangle]") {
+		""
+	} else {
+		"Note: only unmangled functions (`#[no_mangle] pub fn`) are shown"
+	}
+}
+
+async fn respond_codeblocks(
+	ctx: Context<'_>,
+	godbolt_result: Compilation,
+	godbolt_request: GodboltRequest<'_>,
+	lang: &'static str,
+	note: &str,
+) -> Result<(), Error> {
+	const NO_OUTPUT: &str = "No output. Consider adding `#[no_mangle]` before your functions.";
+	match (godbolt_result.output.trim(), godbolt_result.stderr.trim()) {
+		("", "") => respond_codeblock(ctx, "", " ", NO_OUTPUT, &godbolt_request).await?,
+		(output, "") => respond_codeblock(ctx, lang, output, note, &godbolt_request).await?,
+		("<Compilation failed>", errors) => {
+			respond_codeblock(ctx, "ansi", errors, "Compilation failed.", &godbolt_request).await?
+		}
+		("", warnings) => {
+			respond_codeblock(ctx, "ansi", warnings, NO_OUTPUT, &godbolt_request).await?
+		}
+		(output, errors) => {
+			ctx.say(
+				crate::helpers::trim_text(
+					&format!("```{}\n{}``````ansi\n{}", lang, output, errors),
+					&format!("\n```{}", note),
+					async {
+						format!(
+							"Output too large. Godbolt link: <{}>",
+							save_to_shortlink(&ctx.data().http, &godbolt_request).await,
+						)
+					},
+				)
+				.await,
+			)
+			.await?;
+		}
+	};
+	Ok(())
+}
+
 async fn respond_codeblock(
 	ctx: Context<'_>,
 	codeblock_lang: &str,
@@ -218,16 +263,8 @@ pub async fn godbolt(
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let text =
-		crate::helpers::merge_output_and_errors(&godbolt_result.output, &godbolt_result.stderr);
-	let note = if code.code.contains("pub fn") {
-		"Note: only public functions (`pub fn`) are shown\n"
-	} else {
-		""
-	};
-	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
-
-	Ok(())
+	let note = note(&code.code);
+	respond_codeblocks(ctx, godbolt_result, godbolt_request, "x86asm", note).await
 }
 
 /// Run performance analysis using llvm-mca
@@ -260,16 +297,8 @@ pub async fn mca(
 
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let text =
-		crate::helpers::merge_output_and_errors(&godbolt_result.output, &godbolt_result.stderr);
-	let note = if code.code.contains("pub fn") {
-		""
-	} else {
-		"Note: only public functions (`pub fn`) are shown"
-	};
-	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
-
-	Ok(())
+	let note = note(&code.code);
+	respond_codeblocks(ctx, godbolt_result, godbolt_request, "rust", note).await
 }
 
 /// View LLVM IR using Godbolt
@@ -303,14 +332,6 @@ pub async fn llvmir(
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let text =
-		crate::helpers::merge_output_and_errors(&godbolt_result.output, &godbolt_result.stderr);
-	let note = if code.code.contains("pub fn") {
-		""
-	} else {
-		"Note: only public functions (`pub fn`) are shown"
-	};
-	respond_codeblock(ctx, "ansi", &text, note, &godbolt_request).await?;
-
-	Ok(())
+	let note = note(&code.code);
+	respond_codeblocks(ctx, godbolt_result, godbolt_request, "llvm", note).await
 }
