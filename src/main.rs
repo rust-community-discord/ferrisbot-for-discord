@@ -80,7 +80,6 @@ async fn serenity(
 				commands::playground::fmt(),
 				commands::playground::microbench(),
 				commands::playground::procmacro(),
-				commands::tags::tag(),
 			],
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
