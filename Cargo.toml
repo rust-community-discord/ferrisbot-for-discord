@@ -22,8 +22,5 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 image = { version = "0.24", default-features = false, features = ["png"] } # get a better computer meme rendering
 imageproc = { version = "0.23", default-features = false } # get a better computer meme rendering
 rusttype = { version = "0.9", default-features = false } # interact with imageproc
-humantime = "2.1.0"
 rand = "0.8.5"
-chrono = "0.4.38"
 syn = { version = "2.0.68", features = ["full"] }
-quote = "1.0.36"
