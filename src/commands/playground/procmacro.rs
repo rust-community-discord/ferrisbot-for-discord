@@ -2,7 +2,13 @@ use anyhow::Error;
 
 use crate::types::Context;
 
-use super::{api::*, util::*};
+use super::{
+	api::{Channel, CrateType, Edition, Mode, PlayResult, PlaygroundRequest},
+	util::{
+		format_play_eval_stderr, generic_help, maybe_wrap, parse_flags, send_reply, stub_message,
+		GenericHelp, ResultHandling,
+	},
+};
 
 /// Compile and use a procedural macro
 #[poise::command(
@@ -94,6 +100,7 @@ fn main() -> std::io::Result<()> {
 	send_reply(ctx, result, &generated_code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn procmacro_help() -> String {
 	generic_help(GenericHelp {
 		command: "procmacro",

@@ -50,7 +50,7 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	pop_flag!("run", flags.run);
 
 	for (remaining_flag, _) in args.0 {
-		errors += &format!("unknown flag `{}`\n", remaining_flag);
+		errors += &format!("unknown flag `{remaining_flag}`\n");
 	}
 
 	(flags, errors)
@@ -195,14 +195,14 @@ pub fn hoise_crate_attributes(code: &str, after_crate_attrs: &str, after_code: &
 }
 
 /// Utility used by the commands to wrap the given code in a `fn main` if not already wrapped.
-/// To check, whether a wrap was done, check if the return type is Cow::Borrowed vs Cow::Owned
+/// To check, whether a wrap was done, check if the return type is `Cow::Borrowed` vs `Cow::Owned`
 /// If a wrap was done, also hoists crate attributes to the top so they keep working
 pub fn maybe_wrap(code: &str, result_handling: ResultHandling) -> Cow<str> {
 	maybe_wrapped(code, result_handling, false)
 }
 
 pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) -> Cow<str> {
-	use syn::{parse::Parse, *};
+	use syn::{parse, parse::Parse, parse_str, Attribute, Block, Item, ItemFn, Result, Stmt};
 
 	// We use syn to check whether there is a main function.
 	struct Inline {}
@@ -273,7 +273,7 @@ pub async fn send_reply(
 	// Discord displays empty code blocks weirdly if they're not formatted in a specific style,
 	// so we special-case empty code blocks
 	if result.trim().is_empty() {
-		ctx.say(format!("{}``` ```", flag_parse_errors)).await?;
+		ctx.say(format!("{flag_parse_errors}``` ```")).await?;
 		return Ok(());
 	}
 
@@ -286,7 +286,7 @@ pub async fn send_reply(
 	}
 
 	let text = crate::helpers::trim_text(
-		&format!("{}```rust\n{}", flag_parse_errors, result),
+		&format!("{flag_parse_errors}```rust\n{result}"),
 		&text_end,
 		async {
 			format!(
@@ -362,7 +362,7 @@ pub fn strip_fn_main_boilerplate_from_formatted(text: &str) -> String {
 /// Split stderr into compiler output and program stderr output and format the two nicely
 ///
 /// If the program doesn't compile, the compiler output is returned. If it did compile and run,
-/// compiler output (i.e. warnings) is shown only when show_compiler_warnings is true.
+/// compiler output (i.e. warnings) is shown only when `show_compiler_warnings` is true.
 pub fn format_play_eval_stderr(stderr: &str, show_compiler_warnings: bool) -> String {
 	// Extract core compiler output and remove boilerplate lines from top and bottom
 	let compiler_output = extract_relevant_lines(
@@ -392,7 +392,7 @@ pub fn format_play_eval_stderr(stderr: &str, show_compiler_warnings: bool) -> St
 				("", "") => String::new(),
 				(warnings, "") => warnings.to_owned(),
 				("", stderr) => stderr.to_owned(),
-				(warnings, stderr) => format!("{}\n{}", warnings, stderr),
+				(warnings, stderr) => format!("{warnings}\n{stderr}"),
 			}
 		} else {
 			program_stderr.to_owned()

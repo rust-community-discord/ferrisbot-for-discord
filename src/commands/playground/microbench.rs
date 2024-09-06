@@ -2,7 +2,13 @@ use anyhow::Error;
 
 use crate::types::Context;
 
-use super::{api::*, util::*};
+use super::{
+	api::{CrateType, Mode, PlayResult, PlaygroundRequest},
+	util::{
+		format_play_eval_stderr, generic_help, hoise_crate_attributes, parse_flags, send_reply,
+		stub_message, GenericHelp,
+	},
+};
 
 const BENCH_FUNCTION: &str = r#"
 fn bench(functions: &[(&str, fn())]) {
@@ -97,7 +103,7 @@ pub async fn microbench(
 		};
 		let function_name = user_code[function_name_start..function_name_end].trim();
 
-		after_code += &format!("(\"{0}\", {0}), ", function_name);
+		after_code += &format!("(\"{function_name}\", {function_name}), ");
 	}
 	after_code += "]);\n}\n";
 
@@ -131,6 +137,7 @@ pub async fn microbench(
 	send_reply(ctx, result, &code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn microbench_help() -> String {
 	generic_help(GenericHelp {
 		command: "microbench",

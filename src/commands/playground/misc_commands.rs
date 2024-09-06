@@ -5,7 +5,16 @@ use tracing::warn;
 
 use crate::types::Context;
 
-use super::{api::*, util::*};
+use super::{
+	api::{
+		apply_online_rustfmt, ClippyRequest, CrateType, MacroExpansionRequest, MiriRequest,
+		PlayResult,
+	},
+	util::{
+		extract_relevant_lines, generic_help, maybe_wrap, maybe_wrapped, parse_flags, send_reply,
+		strip_fn_main_boilerplate_from_formatted, stub_message, GenericHelp, ResultHandling,
+	},
+};
 
 /// Run code and detect undefined behavior using Miri
 #[poise::command(
@@ -50,6 +59,7 @@ pub async fn miri(
 	send_reply(ctx, result, code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn miri_help() -> String {
 	generic_help(GenericHelp {
 		command: "miri",
@@ -116,6 +126,7 @@ pub async fn expand(
 	send_reply(ctx, result, &code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn expand_help() -> String {
 	generic_help(GenericHelp {
 		command: "expand",
@@ -182,6 +193,7 @@ pub async fn clippy(
 	send_reply(ctx, result, code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn clippy_help() -> String {
 	generic_help(GenericHelp {
 		command: "clippy",
@@ -220,6 +232,7 @@ pub async fn fmt(
 	send_reply(ctx, result, code, &flags, &flag_parse_errors).await
 }
 
+#[must_use]
 pub fn fmt_help() -> String {
 	generic_help(GenericHelp {
 		command: "fmt",

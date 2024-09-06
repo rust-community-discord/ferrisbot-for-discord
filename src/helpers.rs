@@ -7,6 +7,7 @@ use crate::types::{Context, Data};
 /// Used for playground stdout + stderr, or godbolt asm + stderr
 /// If the return value is empty, returns " " instead, because Discord displays those better in
 /// a code block than "".
+#[must_use]
 pub fn merge_output_and_errors<'a>(output: &'a str, errors: &'a str) -> std::borrow::Cow<'a, str> {
 	match (output.trim(), errors.trim()) {
 		("", "") => " ".into(),
@@ -24,7 +25,7 @@ pub async fn acknowledge_fail(error: poise::FrameworkError<'_, Data, Error>) {
 
 		match ctx {
 			Context::Application(_) => {
-				if let Err(e) = ctx.say(format!("❌ {}", error)).await {
+				if let Err(e) = ctx.say(format!("❌ {error}")).await {
 					warn!(
 						"Failed to send failure acknowledgment slash command response: {}",
 						e
@@ -74,9 +75,10 @@ pub async fn acknowledge_success(
 	let emoji = find_custom_emoji(ctx, emoji_name).await;
 	match ctx {
 		Context::Prefix(prefix_context) => {
-			let reaction = emoji
-				.map(serenity::ReactionType::from)
-				.unwrap_or_else(|| serenity::ReactionType::from(fallback));
+			let reaction = emoji.map_or_else(
+				|| serenity::ReactionType::from(fallback),
+				serenity::ReactionType::from,
+			);
 
 			prefix_context.msg.react(&ctx, reaction).await?;
 		}
@@ -98,7 +100,7 @@ pub async fn acknowledge_success(
 
 /// Truncates the message with a given truncation message if the
 /// text is too long. "Too long" means, it either goes beyond Discord's 2000 char message limit,
-/// or if the text_body has too many lines.
+/// or if the `text_body` has too many lines.
 ///
 /// Only `text_body` is truncated. `text_end` will always be appended at the end. This is useful
 /// for example for large code blocks. You will want to truncate the code block contents, but the
@@ -130,9 +132,9 @@ pub async fn trim_text(
 			.collect::<Vec<_>>()
 			.join("\n");
 
-		format!("{}{}{}", text_body, text_end, truncation_msg)
+		format!("{text_body}{text_end}{truncation_msg}")
 	} else {
-		format!("{}{}", text_body, text_end)
+		format!("{text_body}{text_end}")
 	}
 }
 

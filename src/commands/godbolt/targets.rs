@@ -56,9 +56,11 @@ async fn update_godbolt_metadata(data: &Data) -> Result<(), Error> {
 		let update_period = std::env::var("GODBOLT_UPDATE_DURATION")
 			.ok()
 			.and_then(|duration| duration.parse::<u64>().ok())
-			.map(std::time::Duration::from_secs)
-			// Currently set to 12 hours
-			.unwrap_or_else(|| std::time::Duration::from_secs(60 * 60 * 12));
+			.map_or_else(
+				// Currently set for 12 hours
+				|| std::time::Duration::from_secs(60 * 60 * 12),
+				std::time::Duration::from_secs,
+			);
 
 		let time_since_update =
 			std::time::Instant::now().saturating_duration_since(last_update_time);

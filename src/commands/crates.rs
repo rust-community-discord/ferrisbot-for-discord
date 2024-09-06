@@ -73,7 +73,7 @@ fn format_number(mut n: u64) -> String {
 		output.insert_str(0, &format!(" {:03}", n % 1000));
 		n /= 1000;
 	}
-	output.insert_str(0, &format!("{}", n));
+	output.insert_str(0, &format!("{n}"));
 	output
 }
 
@@ -161,7 +161,7 @@ pub async fn crate_(
 /// Returns whether the given type name is the one of a primitive.
 #[rustfmt::skip]
 fn is_in_std(name: &str) -> bool {
-	name.chars().next().map(char::is_uppercase).unwrap_or(false)
+	name.chars().next().is_some_and(char::is_uppercase)
 		|| matches!(
             name,
             "f32" | "f64"
