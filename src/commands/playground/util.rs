@@ -200,11 +200,17 @@ pub fn hoise_crate_attributes(code: &str, after_crate_attrs: &str, after_code: &
 /// To check, whether a wrap was done, check if the return type is `Cow::Borrowed` vs `Cow::Owned`
 /// If a wrap was done, also hoists crate attributes to the top so they keep working
 pub fn maybe_wrap(code: &str, result_handling: ResultHandling) -> Cow<'_, str> {
-	maybe_wrapped(code, result_handling, false)
+	maybe_wrapped(code, result_handling, false, false)
 }
 
-pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) -> Cow<'_, str> {
-	use syn::{parse, parse::Parse, parse_str, Attribute, Block, Item, ItemFn, Result, Stmt};
+pub fn maybe_wrapped(
+	code: &str,
+	result_handling: ResultHandling,
+	unsf: bool,
+	pretty: bool,
+) -> Cow<'_, str> {
+	#[allow(clippy::wildcard_imports)]
+	use syn::{parse::Parse, *};
 
 	// We use syn to check whether there is a main function.
 	struct Inline {}
@@ -235,6 +241,7 @@ pub fn maybe_wrapped(code: &str, result_handling: ResultHandling, unsf: bool) ->
 	let mut after_crate_attrs = match result_handling {
 		ResultHandling::None => "fn main() {\n",
 		ResultHandling::Discard => "fn main() { let _ = {\n",
+		ResultHandling::Print if pretty => "fn main() { println!(\"{:#?}\", {\n",
 		ResultHandling::Print => "fn main() { println!(\"{:?}\", {\n",
 	}
 	.to_owned();
