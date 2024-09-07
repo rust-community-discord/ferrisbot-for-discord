@@ -1,4 +1,7 @@
+use std::{collections::HashMap, mem::take};
+
 use anyhow::{anyhow, Error};
+use poise::{CodeBlockError, KeyValueArgs};
 use tracing::warn;
 
 use crate::types::Context;
@@ -234,36 +237,79 @@ async fn respond_codeblock(
 	Ok(())
 }
 
+fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
+	let mut map = HashMap::new();
+	let mut key = String::new();
+	let mut value = String::new();
+	// flag for in a key
+	let mut k = true;
+	let mut args = args.chars();
+	let mut tick_count = 0;
+	// note: you cant put a backtick in an argument
+	for ch in args.by_ref() {
+		match ch {
+			'`' => {
+				tick_count += 1;
+				break;
+			}
+			' ' => {
+				map.insert(take(&mut key), take(&mut value));
+				k = true
+			}
+			'=' => k = false,
+			c if k => key.push(c),
+			c => value.push(c),
+		}
+	}
+
+	// note: language can be parsed, but is discarded here
+	let mut parsed_lang = false;
+	let mut code = String::new();
+	for ch in args {
+		match ch {
+			// ```
+			'`' if tick_count == 3 && !parsed_lang => return Err(CodeBlockError::default()),
+			// closing
+			'`' if tick_count == 3 && parsed_lang => break,
+			'`' => tick_count += 1,
+			// ```rust
+			//    ^^^^
+			'\n' if tick_count == 3 && !parsed_lang => parsed_lang = true,
+			_ if tick_count == 3 && !parsed_lang => {}
+
+			c => code.push(c),
+		}
+	}
+	Ok((KeyValueArgs(map), code))
+}
+
 /// View assembly using Godbolt
 ///
 /// Compile Rust code using <https://rust.godbolt.org>. Full optimizations are applied unless \
 /// overriden.
 /// ```
-/// ?godbolt flags={} rustc={} ``​`
+/// ?godbolt flag={} rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flags`: flags to pass to rustc invocation. Defaults to `"-Copt-level=3 --edition=2021"`
+/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2021"}
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
-pub async fn godbolt(
-	ctx: Context<'_>,
-	params: poise::KeyValueArgs,
-	code: poise::CodeBlock,
-) -> Result<(), Error> {
+pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
+	let (params, code) = parse(&arguments)?;
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
-		source_code: &code.code,
+		source_code: &code,
 		rustc: &rustc,
 		flags: &flags,
 		run_llvm_mca: false,
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code.code);
+	let note = note(&code);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "x86asm", note).await
 }
 
@@ -272,24 +318,21 @@ pub async fn godbolt(
 /// Run the performance analysis tool llvm-mca using <https://rust.godbolt.org>. Full optimizations \
 /// are applied unless overriden.
 /// ```
-/// ?mca flags={} rustc={} ``​`
+/// ?mca flag={} rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flags`: flags to pass to rustc invocation. Defaults to `"-Copt-level=3 --edition=2021"`
+/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2021"}
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
-pub async fn mca(
-	ctx: Context<'_>,
-	params: poise::KeyValueArgs,
-	code: poise::CodeBlock,
-) -> Result<(), Error> {
+pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
+	let (params, code) = parse(&arguments)?;
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
-		source_code: &code.code,
+		source_code: &code,
 		rustc: &rustc,
 		flags: &flags,
 		run_llvm_mca: true,
@@ -297,7 +340,7 @@ pub async fn mca(
 
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code.code);
+	let note = note(&code);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "rust", note).await
 }
 
@@ -308,30 +351,27 @@ pub async fn mca(
 ///
 /// Equivalent to ?godbolt but with extra flags `--emit=llvm-ir -Cdebuginfo=0`.
 /// ```
-/// ?llvmir flags={} rustc={} ``​`
+/// ?llvmir flag={} rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flags`: flags to pass to rustc invocation. Defaults to `"-Copt-level=3 --edition=2021"`
+/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2021", "--emit=llvm-ir", "-Cdebuginfo=0"}
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
-pub async fn llvmir(
-	ctx: Context<'_>,
-	params: poise::KeyValueArgs,
-	code: poise::CodeBlock,
-) -> Result<(), Error> {
+pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
+	let (params, code) = parse(&arguments)?;
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
-		source_code: &code.code,
+		source_code: &code,
 		rustc: &rustc,
 		flags: &(flags + " --emit=llvm-ir -Cdebuginfo=0"),
 		run_llvm_mca: false,
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code.code);
+	let note = note(&code);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "llvm", note).await
 }
