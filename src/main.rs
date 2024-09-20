@@ -121,9 +121,7 @@ async fn serenity(
 			on_error: |error| {
 				Box::pin(async move {
 					warn!("Encountered error: {:?}", error);
-					if let poise::FrameworkError::ArgumentParse { error, ctx, .. } = error {
-						let response = if error.is::<poise::CodeBlockError>() {
-							"\
+					const FAILED_CODEBLOCK: &str = "\
 Missing code block. Please use the following markdown:
 `` `code here` ``
 or
@@ -131,8 +129,10 @@ or
 `\x1b[0m`\x1b[0m`rust
 code here
 `\x1b[0m`\x1b[0m`
-```"
-							.to_owned()
+```";
+					if let poise::FrameworkError::ArgumentParse { error, ctx, .. } = error {
+						let response = if error.is::<poise::CodeBlockError>() {
+							FAILED_CODEBLOCK.to_owned()
 						} else if let Some(multiline_help) = &ctx.command().help_text {
 							format!("**{error}**\n{multiline_help}")
 						} else {
@@ -143,6 +143,11 @@ code here
 							warn!("{}", e);
 						}
 					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
+						if error.is::<poise::CodeBlockError>() {
+							if let Err(e) = ctx.say(FAILED_CODEBLOCK.to_owned()).await {
+								warn!("{}", e)
+							}
+						}
 						if let Err(e) = ctx.say(error.to_string()).await {
 							warn!("{}", e);
 						}

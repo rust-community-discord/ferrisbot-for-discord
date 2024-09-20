@@ -1,3 +1,5 @@
+use std::iter::once;
+
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use tracing::{error, info};
@@ -145,10 +147,18 @@ pub(crate) async fn rustc_id_and_flags(
 			"the `rustc` argument should be a version specifier like `nightly` `beta` or `1.45.2`. \
             Run ?targets for a full list"))?;
 
-	let flags = params
-		.get("flags")
-		.unwrap_or("-Copt-level=3 --edition=2021")
-		.to_owned();
+	let opt_level = params.get("-Copt-level").unwrap_or("3");
+	let edition = params.get("--edition").unwrap_or("2021");
+	let flags = itertools::Itertools::intersperse(params
+		.0
+		.iter()
+		.filter(|(k, _)| !matches!(k.as_str(), "rustc" | "-Copt-level" | "--edition"))
+		.map(|(a, b)| format!("{a}={b}"))
+		.chain(once(format!("-Copt-level={opt_level}")))
+		.chain(once(format!("--edition={edition}"))), " ".to_string())
+		// itertools was already imported by prost
+		.collect::<String>();
+	println!("{flags}");
 
 	Ok((target.id, flags))
 }

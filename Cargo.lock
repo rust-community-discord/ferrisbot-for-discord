@@ -748,6 +748,7 @@ dependencies = [
  "anyhow",
  "image",
  "imageproc",
+ "itertools 0.12.1",
  "poise",
  "rand 0.8.5",
  "reqwest",
