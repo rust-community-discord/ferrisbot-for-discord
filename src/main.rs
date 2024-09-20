@@ -1,3 +1,13 @@
+#![warn(rust_2018_idioms, clippy::pedantic)]
+#![allow(
+	clippy::too_many_lines,
+	clippy::missing_errors_doc,
+	clippy::missing_panics_doc,
+	clippy::cast_possible_wrap,
+	clippy::module_name_repetitions,
+	clippy::assigning_clones, // Too many false triggers
+)]
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -124,17 +134,17 @@ code here
 ```"
 							.to_owned()
 						} else if let Some(multiline_help) = &ctx.command().help_text {
-							format!("**{}**\n{}", error, multiline_help)
+							format!("**{error}**\n{multiline_help}")
 						} else {
 							error.to_string()
 						};
 
 						if let Err(e) = ctx.say(response).await {
-							warn!("{}", e)
+							warn!("{}", e);
 						}
 					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
 						if let Err(e) = ctx.say(error.to_string()).await {
-							warn!("{}", e)
+							warn!("{}", e);
 						}
 					}
 				})
@@ -210,8 +220,7 @@ async fn event_handler(
 				new_member.user.id,
 				data.rustacean_role_id,
 				Some(&format!(
-					"Automatically rustified after {} minutes",
-					RUSTIFICATION_DELAY
+					"Automatically rustified after {RUSTIFICATION_DELAY} minutes"
 				)),
 			)
 			.await;

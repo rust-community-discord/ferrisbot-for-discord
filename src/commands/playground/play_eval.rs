@@ -2,7 +2,13 @@ use anyhow::Error;
 
 use crate::types::Context;
 
-use super::{api::*, util::*};
+use super::{
+	api::{CrateType, PlayResult, PlaygroundRequest},
+	util::{
+		format_play_eval_stderr, generic_help, maybe_wrapped, parse_flags, send_reply,
+		stub_message, GenericHelp, ResultHandling,
+	},
+};
 
 // play and eval work similarly, so this function abstracts over the two
 async fn play_or_eval(
@@ -58,6 +64,7 @@ pub async fn play(
 	play_or_eval(ctx, flags, false, code, ResultHandling::None).await
 }
 
+#[must_use]
 pub fn play_help() -> String {
 	generic_help(GenericHelp {
 		command: "play",
@@ -84,6 +91,7 @@ pub async fn playwarn(
 	play_or_eval(ctx, flags, true, code, ResultHandling::None).await
 }
 
+#[must_use]
 pub fn playwarn_help() -> String {
 	generic_help(GenericHelp {
 		command: "playwarn",
@@ -110,6 +118,7 @@ pub async fn eval(
 	play_or_eval(ctx, flags, false, code, ResultHandling::Print).await
 }
 
+#[must_use]
 pub fn eval_help() -> String {
 	generic_help(GenericHelp {
 		command: "eval",

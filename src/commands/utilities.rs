@@ -79,7 +79,7 @@ pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
 /// Tells you how long the bot has been up for
 #[poise::command(prefix_command, slash_command, category = "Utilities")]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
-	let uptime = std::time::Instant::now() - ctx.data().bot_start_time;
+	let uptime = ctx.data().bot_start_time.elapsed();
 
 	let div_mod = |a, b| (a / b, a % b);
 
@@ -88,11 +88,8 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 	let (hours, minutes) = div_mod(minutes, 60);
 	let (days, hours) = div_mod(hours, 24);
 
-	ctx.say(format!(
-		"Uptime: {}d {}h {}m {}s",
-		days, hours, minutes, seconds
-	))
-	.await?;
+	ctx.say(format!("Uptime: {days}d {hours}h {minutes}m {seconds}s"))
+		.await?;
 
 	Ok(())
 }
@@ -121,12 +118,12 @@ pub async fn conradluget(
 		.decode()
 		.expect("failed to load image")
 	});
-	static FONT: LazyLock<rusttype::Font> = LazyLock::new(|| {
+	static FONT: LazyLock<rusttype::Font<'_>> = LazyLock::new(|| {
 		rusttype::Font::try_from_bytes(include_bytes!("../../assets/OpenSans.ttf"))
 			.expect("failed to load font")
 	});
 
-	let text = format!("Get {}", text);
+	let text = format!("Get {text}");
 	let image = imageproc::drawing::draw_text(
 		&*BASE_IMAGE,
 		image::Rgba([201, 209, 217, 255]),
@@ -214,7 +211,7 @@ pub async fn ban(
 	ctx.say(format!(
 		"Banned user {}  {}",
 		banned_user.user.name,
-		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨').await
+		crate::helpers::custom_emoji_code(ctx, "ferrisBanne", '🔨')
 	))
 	.await?;
 	Ok(())

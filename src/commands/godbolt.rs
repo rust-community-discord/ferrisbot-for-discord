@@ -24,7 +24,7 @@ struct GodboltOutput(Vec<GodboltOutputSegment>);
 impl GodboltOutput {
 	pub fn concatenate(&self) -> String {
 		let mut complete_text = String::new();
-		for segment in self.0.iter() {
+		for segment in &self.0 {
 			complete_text.push_str(&segment.text);
 			complete_text.push('\n');
 		}
@@ -185,16 +185,16 @@ async fn respond_codeblocks(
 		("", "") => respond_codeblock(ctx, "", " ", NO_OUTPUT, &godbolt_request).await?,
 		(output, "") => respond_codeblock(ctx, lang, output, note, &godbolt_request).await?,
 		("<Compilation failed>", errors) => {
-			respond_codeblock(ctx, "ansi", errors, "Compilation failed.", &godbolt_request).await?
+			respond_codeblock(ctx, "ansi", errors, "Compilation failed.", &godbolt_request).await?;
 		}
 		("", warnings) => {
-			respond_codeblock(ctx, "ansi", warnings, NO_OUTPUT, &godbolt_request).await?
+			respond_codeblock(ctx, "ansi", warnings, NO_OUTPUT, &godbolt_request).await?;
 		}
 		(output, errors) => {
 			ctx.say(
 				crate::helpers::trim_text(
-					&format!("```{}\n{}``````ansi\n{}", lang, output, errors),
-					&format!("\n```{}", note),
+					&format!("```{lang}\n{output}``````ansi\n{errors}"),
+					&format!("\n```{note}"),
 					async {
 						format!(
 							"Output too large. Godbolt link: <{}>",
@@ -219,8 +219,8 @@ async fn respond_codeblock(
 ) -> Result<(), Error> {
 	ctx.say(
 		crate::helpers::trim_text(
-			&format!("```{}\n{}", codeblock_lang, text),
-			&format!("\n```{}", note),
+			&format!("```{codeblock_lang}\n{text}"),
+			&format!("\n```{note}"),
 			async {
 				format!(
 					"Output too large. Godbolt link: <{}>",

@@ -1,5 +1,6 @@
 use crate::types::Context;
 
+#[must_use]
 pub fn is_moderator(ctx: Context<'_>) -> bool {
 	let mod_role_id = ctx.data().mod_role_id;
 	match ctx {
