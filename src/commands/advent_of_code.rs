@@ -3,7 +3,7 @@ use std::{fmt::Display, str::FromStr};
 use poise::serenity_prelude::{
 	ChannelId, ComponentInteraction, Context, CreateActionRow, CreateButton,
 	CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateThread,
-	EditMessage,
+	EditMessage, GuildChannel,
 };
 use time::{Month, OffsetDateTime, UtcOffset};
 
@@ -38,12 +38,24 @@ pub async fn create_aoc_announcement(
 ) -> Result<(), Error> {
 	let year = OffsetDateTime::now_utc().year() as u32;
 
+	// Get existing threads for AoC days in case this command is being used to re-create
+	// the announcement after being (accidentally) deleted.
+	let mut days = get_existing_aoc_threads(year, &ctx)
+		.await?
+		.filter_map(|(id, channel)| {
+			channel
+				.owner_id
+				.is_some_and(|owner| owner == ctx.framework().bot_id)
+				.then_some((id.day, channel.id))
+		})
+		.collect::<Vec<_>>();
+	days.sort_by_key(|(day, _)| *day);
+	days.dedup_by_key(|(day, _)| *day);
+
 	let announcement = AoCAnnounceMessage {
 		year,
 		general_thread_id: general_thread,
-		// TODO: Search for existing channels and include them here,
-		// in case the original announcement message is deleted on accident or needs updating
-		days: Vec::new(),
+		days,
 	};
 
 	ctx.defer_ephemeral().await?;
@@ -68,25 +80,28 @@ pub async fn open_aoc_thread(
 	ctx: &Context,
 ) -> Result<(), Error> {
 	let today = OffsetDateTime::now_utc().to_offset(UtcOffset::from_hms(-5, 0, 0).unwrap());
+	let reply = |reply| {
+		interaction.create_response(
+			ctx,
+			CreateInteractionResponse::Message(
+				CreateInteractionResponseMessage::new()
+					.ephemeral(true)
+					.content(reply),
+			),
+		)
+	};
 
 	if today.month() != Month::December || today.day() > 24 {
-		interaction
-			.create_response(
-				ctx,
-				CreateInteractionResponse::Message(
-					CreateInteractionResponseMessage::new()
-						.ephemeral(true)
-						.content("AoC is not taking place right now"),
-				),
-			)
-			.await?;
+		reply("AoC is not taking place right now".to_string()).await?;
 		return Ok(());
 	}
 
 	let mut announcement = {
 		let last_message = data.aoc_last_message.read().await;
 		let current = interaction.message.as_ref();
-		// Avoid a race by checking if the message stored in aoc_last_message has been edited after the message that triggered the interaction
+		// Avoid a race by checking if the message stored in aoc_last_message has been edited
+		// after the message that triggered the interaction.
+		// Make sure there are no .await points between here and the write lock!
 		last_message
 			.as_ref()
 			.filter(|other| {
@@ -97,56 +112,40 @@ pub async fn open_aoc_thread(
 			.content
 			.parse::<AoCAnnounceMessage>()
 	}
-	.context("Failed to parse announcement message, please report this!")?;
+	.context("Failed to parse announcement message")?;
 
 	if announcement.year as i32 != today.year() {
-		interaction
-			.create_response(
-				ctx,
-				CreateInteractionResponse::Message(
-					CreateInteractionResponseMessage::new()
-						.ephemeral(true)
-						.content("This AoC is from another year"),
-				),
-			)
-			.await?;
+		reply("This AoC is from another year".to_string()).await?;
 		return Ok(());
 	}
-
-	let send_thread_id_response = |id| {
-		interaction.create_response(
-			ctx,
-			CreateInteractionResponse::Message(
-				CreateInteractionResponseMessage::new()
-					.ephemeral(true)
-					.content(format!("Today's thread thread is: <#{}>", id)),
-			),
-		)
-	};
-
-	// Early return if today's thread is already present in the message
-	if let Some(thread_id) = announcement
-		.days
-		.iter()
-		.find_map(|(day, id)| (*day == today.day()).then_some(*id))
-	{
-		send_thread_id_response(thread_id.get()).await?;
-		return Ok(());
-	}
-
-	let mut last_message_lock = data.aoc_last_message.write().await;
 
 	let today_id = AoCThreadId {
 		year: announcement.year,
 		day: today.day(),
 	};
 
+	// Early return if today's thread is already present in the message
+	if let Some(thread_id) = announcement
+		.days
+		.iter()
+		.find_map(|(day, id)| (*day == today_id.day).then_some(*id))
+	{
+		reply(format!("Today's thread thread is: <#{}>", thread_id.get())).await?;
+
+		return Ok(());
+	}
+
+	let mut last_message_lock = data.aoc_last_message.write().await;
+
 	// Create missing threads
-	for missing in (announcement.days.last().map_or(1, |(d, _)| *d)..=today_id.day)
+	for missing in (announcement
+		.days
+		.last()
+		.map_or(1, |(day, _)| *day + 1)..=today_id.day)
 		.map(|day| AoCThreadId { day, ..today_id })
 	{
-		let thread = data
-			.aoc_channel_id
+		let thread = interaction
+			.channel_id
 			.create_thread(
 				ctx,
 				CreateThread::new(format!("{missing}"))
@@ -158,13 +157,20 @@ pub async fn open_aoc_thread(
 			)
 			.await?;
 		announcement.days.push((missing.day, thread.id));
+
+		if missing.day == today_id.day {
+			reply(format!(
+				"Created thread for today's challenge: <#{}>",
+				thread.id
+			))
+			.await?;
+		}
 	}
 
-	let message = data
-		.aoc_channel_id
-		.edit_message(
+	let mut message = *interaction.message.to_owned();
+	message
+		.edit(
 			ctx,
-			interaction.message.id,
 			EditMessage::new()
 				.content(format!("{announcement}"))
 				.components(aoc_announcement_components()),
@@ -184,9 +190,66 @@ fn aoc_announcement_components() -> Vec<CreateActionRow> {
 	.emoji('🧵')])]
 }
 
+async fn get_existing_aoc_threads<'ctx>(
+	year: u32,
+	ctx: &'ctx CommandContext<'_>,
+) -> Result<impl Iterator<Item = (AoCThreadId, GuildChannel)> + 'ctx, Error> {
+	// Get all active threads in the current channel
+	let from_active_threads = ctx
+		.guild_id()
+		.context("Must be run inside a guild")?
+		.get_active_threads(ctx)
+		.await?
+		.threads
+		.into_iter()
+		.filter(|channel| {
+			channel
+				.parent_id
+				.is_some_and(|parent_id| parent_id == ctx.channel_id())
+		});
+	// Get all archived threads in the current channel
+	let from_archived_threads = ctx
+		.channel_id()
+		.get_archived_public_threads(ctx, None, Some(100))
+		.await?
+		.threads;
+
+	Ok(from_active_threads
+		.chain(from_archived_threads)
+		.filter_map(move |channel| {
+			Some((
+				channel
+					.name()
+					.parse::<AoCThreadId>()
+					.ok()
+					.filter(|id| id.year == year)?,
+				channel,
+			))
+		}))
+}
+
 impl Display for AoCThreadId {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "AoC {} | Day {} Discussion", self.year, self.day)
+	}
+}
+
+impl FromStr for AoCThreadId {
+	type Err = Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		let s = s.strip_prefix("AoC ").context("Missing 'AoC ' prefix")?;
+		let (year, s) = s
+			.split_once(" | Day ")
+			.context("Not separated by ' | Day ")?;
+		let day = s
+			.strip_suffix(" Discussion")
+			.context("Missing ' Discussion' suffix")?;
+
+		Ok(Self {
+			year: year.parse()?,
+			day: day.parse()?,
+		})
 	}
 }
 
@@ -266,7 +329,14 @@ impl FromStr for AoCAnnounceMessage {
 mod tests {
 	use poise::serenity_prelude::ChannelId;
 
-	use crate::commands::advent_of_code::AoCAnnounceMessage;
+	use crate::commands::advent_of_code::{AoCAnnounceMessage, AoCThreadId};
+
+	#[test]
+	fn parse_aoc_id() {
+		let id = AoCThreadId { year: 2024, day: 3 };
+
+		assert_eq!(format!("{id}").parse::<AoCThreadId>().unwrap(), id);
+	}
 
 	#[test]
 	fn parse_aoc_announcement() {

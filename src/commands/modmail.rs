@@ -134,7 +134,7 @@ When creating a rule-breaking report please give a brief description of what is 
 
 The modmail will materialize itself as a private thread under this channel with a random ID. You will be pinged in the thread once the report is opened. Once the report is dealt with, it will be archived")
 					.button(
-						serenity::CreateButton::new("rplcs_create_new_modmail")
+						serenity::CreateButton::new(INTERACTION_CUSTOM_ID)
 							.label("Create New Modmail")
 							.emoji(serenity::ReactionType::Unicode("📩".to_string()))
 							.style(serenity::ButtonStyle::Primary),
