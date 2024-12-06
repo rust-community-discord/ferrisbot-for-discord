@@ -1,7 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
 use poise::serenity_prelude::{
-	ChannelId, ComponentInteraction, Context, CreateActionRow, CreateButton,
+	ChannelId, ChannelType, ComponentInteraction, Context, CreateActionRow, CreateButton,
 	CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateThread,
 	EditMessage, GuildChannel,
 };
@@ -34,8 +34,17 @@ struct AoCAnnounceMessage {
 )]
 pub async fn create_aoc_announcement(
 	ctx: CommandContext<'_>,
-	#[description = "Thread for general discussions about AoC"] general_thread: ChannelId,
+	#[description = "Thread for general discussions about AoC"] general_thread: Option<ChannelId>,
 ) -> Result<(), Error> {
+	if !ctx
+		.guild_channel()
+		.await
+		.is_some_and(|channel| matches!(channel.kind, ChannelType::Text))
+	{
+		ctx.reply("Invalid context").await?;
+		return Ok(());
+	}
+
 	let year = OffsetDateTime::now_utc().year() as u32;
 
 	// Get existing threads for AoC days in case this command is being used to re-create
@@ -52,9 +61,23 @@ pub async fn create_aoc_announcement(
 	days.sort_by_key(|(day, _)| *day);
 	days.dedup_by_key(|(day, _)| *day);
 
+	let general_thread_id = if let Some(general_thread_id) = general_thread {
+		general_thread_id
+	} else {
+		let thread = ctx
+			.channel_id()
+			.create_thread(
+				ctx,
+				CreateThread::new(format!("AoC {year} | General"))
+					.auto_archive_duration(poise::serenity_prelude::AutoArchiveDuration::OneWeek),
+			)
+			.await?;
+		thread.id
+	};
+
 	let announcement = AoCAnnounceMessage {
 		year,
-		general_thread_id: general_thread,
+		general_thread_id,
 		days,
 	};
 
@@ -138,10 +161,7 @@ pub async fn open_aoc_thread(
 	let mut last_message_lock = data.aoc_last_message.write().await;
 
 	// Create missing threads
-	for missing in (announcement
-		.days
-		.last()
-		.map_or(1, |(day, _)| *day + 1)..=today_id.day)
+	for missing in (announcement.days.last().map_or(1, |(day, _)| *day + 1)..=today_id.day)
 		.map(|day| AoCThreadId { day, ..today_id })
 	{
 		let thread = interaction
