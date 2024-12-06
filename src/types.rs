@@ -13,6 +13,9 @@ pub struct Data {
 	pub application_id: serenity::UserId,
 	pub mod_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
+	/// Channel to create per-day Advent Of Code threads in
+	pub aoc_channel_id: serenity::ChannelId,
+	pub aoc_last_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
 	pub modmail_channel_id: serenity::ChannelId,
 	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
 	pub bot_start_time: std::time::Instant,
@@ -57,6 +60,14 @@ impl Data {
 				))?
 				.parse::<u64>()?
 				.into(),
+			aoc_channel_id: secret_store
+				.get("ADVENT_OF_CODE_CHANNEL_ID")
+				.ok_or(anyhow!(
+					"Failed to get 'ADVENT_OF_CODE_CHANNEL_ID' from the secret store"
+				))?
+				.parse::<u64>()?
+				.into(),
+			aoc_last_message: Arc::default(),
 			modmail_message: Arc::default(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),

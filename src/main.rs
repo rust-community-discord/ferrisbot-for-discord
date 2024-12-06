@@ -92,6 +92,7 @@ async fn serenity(
 				commands::playground::fmt(),
 				commands::playground::microbench(),
 				commands::playground::procmacro(),
+				commands::advent_of_code::create_aoc_announcement(),
 			],
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
@@ -241,9 +242,15 @@ async fn event_handler(
 		..
 	} = event
 	{
-		if component.data.custom_id == "rplcs_create_new_modmail" {
-			let message = "Created from modmail button";
-			create_modmail_thread(ctx, message, data, component.user.id).await?;
+		match component.data.custom_id.as_str() {
+			commands::modmail::INTERACTION_CUSTOM_ID => {
+				let message = "Created from modmail button";
+				create_modmail_thread(ctx, message, data, component.user.id).await?;
+			}
+			commands::advent_of_code::INTERACTION_CUSTOM_ID => {
+				commands::advent_of_code::open_aoc_thread(component, data, ctx).await?;
+			}
+			id => tracing::debug!("Received unknown interaction with custom id: {id}"),
 		}
 	}
 

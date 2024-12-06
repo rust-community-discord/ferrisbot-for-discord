@@ -5,6 +5,8 @@ use poise::serenity_prelude::{EditThread, GuildChannel, Mentionable, UserId};
 use rand::{thread_rng, Rng};
 use tracing::{debug, info};
 
+pub const INTERACTION_CUSTOM_ID: &str = "rplcs_create_new_modmail";
+
 /// Opens a modmail thread for a message. To use, right-click the message that
 /// you want to report, then go to "Apps" > "Open Modmail".
 #[poise::command(
