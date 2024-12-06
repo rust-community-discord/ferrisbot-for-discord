@@ -1,11 +1,11 @@
 use std::{fmt::Display, str::FromStr};
 
+use chrono::{Datelike, FixedOffset, Utc};
 use poise::serenity_prelude::{
 	ChannelId, ChannelType, ComponentInteraction, Context, CreateActionRow, CreateButton,
 	CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateThread,
 	EditMessage, GuildChannel,
 };
-use time::{Month, OffsetDateTime, UtcOffset};
 
 use crate::types::{Context as CommandContext, Data};
 use anyhow::{Context as AnyhowContext, Error};
@@ -45,7 +45,7 @@ pub async fn create_aoc_announcement(
 		return Ok(());
 	}
 
-	let year = OffsetDateTime::now_utc().year() as u32;
+	let year = Utc::now().year() as u32;
 
 	// Get existing threads for AoC days in case this command is being used to re-create
 	// the announcement after being (accidentally) deleted.
@@ -102,7 +102,7 @@ pub async fn open_aoc_thread(
 	data: &Data,
 	ctx: &Context,
 ) -> Result<(), Error> {
-	let today = OffsetDateTime::now_utc().to_offset(UtcOffset::from_hms(-5, 0, 0).unwrap());
+	let today = Utc::now().with_timezone(&FixedOffset::west_opt(5 * 60 * 60).unwrap());
 	let reply = |reply| {
 		interaction.create_response(
 			ctx,
@@ -114,7 +114,7 @@ pub async fn open_aoc_thread(
 		)
 	};
 
-	if today.month() != Month::December || today.day() > 24 {
+	if today.month() != 12 || today.day() > 24 {
 		reply("AoC is not taking place right now".to_string()).await?;
 		return Ok(());
 	}
@@ -144,7 +144,7 @@ pub async fn open_aoc_thread(
 
 	let today_id = AoCThreadId {
 		year: announcement.year,
-		day: today.day(),
+		day: today.day() as u8,
 	};
 
 	// Early return if today's thread is already present in the message

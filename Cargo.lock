@@ -746,6 +746,7 @@ name = "ferrisbot-for-discord"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "image",
  "imageproc",
  "itertools 0.12.1",
@@ -760,7 +761,6 @@ dependencies = [
  "shuttle-shared-db",
  "sqlx",
  "syn 2.0.77",
- "time",
  "tokio",
  "tracing",
 ]
