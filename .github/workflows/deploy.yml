@@ -10,39 +10,15 @@ jobs:
     runs-on: "ubuntu-latest"
     environment: "production"
     steps:
-      - name: "Checkout repository"
-        uses: actions/checkout@v4
-
-      - name: "Update Rust version"
-        run: |
-          rustup update
-          rustc --version
-          cargo --version
-
-      - name: "Install shuttle.rs CLI"
-        run: |
-          # using cargo-binstall because it is faster to get shuttle-cli binary
-          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall -y --locked cargo-shuttle
-
-      - name: "Log into shuttle.rs"
-        run: |
-          cargo shuttle login --api-key ${{ secrets.SHUTTLE_DEPLOY_KEY }}
-
-      - name: "Set up cargo cache"
-        uses: Swatinem/rust-cache@v2
-
-      - name: "Create Secrets.toml file"
-        run: |
-          echo "# From secret store" >> Secrets.toml
-          echo "DISCORD_TOKEN=\"${{ secrets.DISCORD_TOKEN }}\"" >> Secrets.toml
-          echo "# From env var store" >> Secrets.toml
-          echo "DISCORD_GUILD=\"${{ vars.DISCORD_GUILD }}\"" >> Secrets.toml
-          echo "APPLICATION_ID=\"${{ vars.APPLICATION_ID }}\"" >> Secrets.toml
-          echo "MOD_ROLE_ID=\"${{ vars.MOD_ROLE_ID }}\"" >> Secrets.toml
-          echo "RUSTACEAN_ROLE_ID=\"${{ vars.RUSTACEAN_ROLE_ID }}\"" >> Secrets.toml
-          echo "MODMAIL_CHANNEL_ID=\"${{ vars.MODMAIL_CHANNEL_ID }}\"" >> Secrets.toml
-
-      - name: "Deploy to shuttle.rs"
-        run: |
-          cargo shuttle deploy | awk '!/Database URI.*?$/'
+      - uses: shuttle-hq/deploy-action@v2
+        with:
+          shuttle-api-key: ${{ secrets.SHUTTLE_API_KEY }}
+          project-id: 'proj_01JK1SA5EGYWSNFR7WC9AV5NCJ'
+          extra-args: --allow-dirty --debug
+          secrets: |
+            DISCORD_TOKEN = '${{ secrets.DISCORD_TOKEN }}'
+            DISCORD_GUILD = '${{ secrets.DISCORD_GUILD }}'
+            APPLICATION_ID = '${{ secrets.APPLICATION_ID }}'
+            MOD_ROLE_ID = '${{ secrets.MOD_ROLE_ID }}'
+            RUSTACEAN_ROLE_ID = '${{ secrets.RUSTACEAN_ROLE_ID }}'
+            MODMAIL_CHANNEL_ID = '${{ secrets.MODMAIL_CHANNEL_ID }}'

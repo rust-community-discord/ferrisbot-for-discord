@@ -21,3 +21,6 @@ Secrets.dev.toml
 
 # Allow the .github folder
 !.github/
+/target
+.shuttle*
+Secrets*.toml
