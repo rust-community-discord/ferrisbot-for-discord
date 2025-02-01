@@ -12,13 +12,13 @@ jobs:
     steps:
       - uses: shuttle-hq/deploy-action@v2
         with:
-          shuttle-api-key: ${{ secrets.SHUTTLE_API_KEY }}
+          shuttle-api-key: ${{ secrets.SHUTTLE_DEPLOY_KEY }}
           project-id: 'proj_01JK1SA5EGYWSNFR7WC9AV5NCJ'
           extra-args: --allow-dirty --debug
           secrets: |
             DISCORD_TOKEN = '${{ secrets.DISCORD_TOKEN }}'
-            DISCORD_GUILD = '${{ secrets.DISCORD_GUILD }}'
-            APPLICATION_ID = '${{ secrets.APPLICATION_ID }}'
-            MOD_ROLE_ID = '${{ secrets.MOD_ROLE_ID }}'
-            RUSTACEAN_ROLE_ID = '${{ secrets.RUSTACEAN_ROLE_ID }}'
-            MODMAIL_CHANNEL_ID = '${{ secrets.MODMAIL_CHANNEL_ID }}'
+            DISCORD_GUILD = '${{ vars.DISCORD_GUILD }}'
+            APPLICATION_ID = '${{ vars.APPLICATION_ID }}'
+            MOD_ROLE_ID = '${{ vars.MOD_ROLE_ID }}'
+            RUSTACEAN_ROLE_ID = '${{ vars.RUSTACEAN_ROLE_ID }}'
+            MODMAIL_CHANNEL_ID = '${{ vars.MODMAIL_CHANNEL_ID }}'
