@@ -254,7 +254,7 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 			}
 			' ' => {
 				map.insert(take(&mut key), take(&mut value));
-				k = true
+				k = true;
 			}
 			'=' => k = false,
 			c if k => key.push(c),
