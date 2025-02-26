@@ -31,6 +31,16 @@ async fn serenity(
 	#[shuttle_runtime::Secrets] secret_store: SecretStore,
 	#[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
 ) -> ShuttleSerenity {
+	const FAILED_CODEBLOCK: &str = "\
+Missing code block. Please use the following markdown:
+`` `code here` ``
+or
+```ansi
+`\x1b[0m`\x1b[0m`rust
+code here
+`\x1b[0m`\x1b[0m`
+```";
+
 	let token = secret_store
 		.get("DISCORD_TOKEN")
 		.expect("Couldn't find your DISCORD_TOKEN!");
@@ -121,15 +131,6 @@ async fn serenity(
 			on_error: |error| {
 				Box::pin(async move {
 					warn!("Encountered error: {:?}", error);
-					const FAILED_CODEBLOCK: &str = "\
-Missing code block. Please use the following markdown:
-`` `code here` ``
-or
-```ansi
-`\x1b[0m`\x1b[0m`rust
-code here
-`\x1b[0m`\x1b[0m`
-```";
 					if let poise::FrameworkError::ArgumentParse { error, ctx, .. } = error {
 						let response = if error.is::<poise::CodeBlockError>() {
 							FAILED_CODEBLOCK.to_owned()
@@ -145,7 +146,7 @@ code here
 					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
 						if error.is::<poise::CodeBlockError>() {
 							if let Err(e) = ctx.say(FAILED_CODEBLOCK.to_owned()).await {
-								warn!("{}", e)
+								warn!("{}", e);
 							}
 						}
 						if let Err(e) = ctx.say(error.to_string()).await {
