@@ -252,11 +252,11 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 				tick_count += 1;
 				break;
 			}
-			' ' => {
+			' ' | '\n' => {
 				map.insert(take(&mut key), take(&mut value));
 				k = true;
 			}
-			'=' => k = false,
+			'=' if k => k = false,
 			c if k => key.push(c),
 			c => value.push(c),
 		}
@@ -288,14 +288,14 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 /// Compile Rust code using <https://rust.godbolt.org>. Full optimizations are applied unless \
 /// overriden.
 /// ```
-/// ?godbolt flag={} rustc={} ``​`
+/// ?godbolt $($flags )* rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2024"}
+/// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
@@ -318,14 +318,14 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 /// Run the performance analysis tool llvm-mca using <https://rust.godbolt.org>. Full optimizations \
 /// are applied unless overriden.
 /// ```
-/// ?mca flag={} rustc={} ``​`
+/// ?mca $($flags )* rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2024"}
+/// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
@@ -351,14 +351,14 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 ///
 /// Equivalent to ?godbolt but with extra flags `--emit=llvm-ir -Cdebuginfo=0`.
 /// ```
-/// ?llvmir flag={} rustc={} ``​`
+/// ?llvmir $($flags )* rustc={} ``​`
 /// pub fn your_function() {
 ///     // Code
 /// }
 /// ``​`
 /// ```
 /// Optional arguments:
-/// - `flag*`: flags to pass to rustc invocation. Defaults to {"-Copt-level=3", "--edition=2024", "--emit=llvm-ir", "-Cdebuginfo=0"}
+/// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
