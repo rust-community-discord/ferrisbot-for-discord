@@ -144,8 +144,7 @@ pub async fn conradluget(
 
 	let attachment = serenity::CreateAttachment::bytes(img_bytes, filename);
 
-	ctx.channel_id()
-		.send_files(ctx, vec![attachment], serenity::CreateMessage::new())
+	ctx.send(poise::CreateReply::default().attachment(attachment))
 		.await?;
 
 	Ok(())
