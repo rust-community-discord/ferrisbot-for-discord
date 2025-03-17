@@ -169,10 +169,10 @@ enum GodboltMode {
 }
 
 fn note(code: &str) -> &'static str {
-	if code.contains("#[no_mangle]") {
+	if code.contains("#[no_mangle]") || code.contains("#[unsafe(no_mangle)]") || code.contains("#[inline(never)]") {
 		""
 	} else {
-		"Note: only unmangled functions (`#[no_mangle] pub fn`) are shown"
+		"Note: only unmangled functions or public no-inline functions (`#[unsafe(no_mangle)] pub fn` or `#[inline(never)] pub fn`) are shown"
 	}
 }
 
