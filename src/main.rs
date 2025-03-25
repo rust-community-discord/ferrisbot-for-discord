@@ -74,6 +74,7 @@ code here
 		})
 		.options(poise::FrameworkOptions {
 			commands: vec![
+				commands::man::man(),
 				commands::crates::crate_(),
 				commands::crates::doc(),
 				commands::godbolt::godbolt(),
