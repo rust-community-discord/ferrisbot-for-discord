@@ -2,7 +2,7 @@ use std::{collections::HashMap, mem::take};
 
 use anyhow::{anyhow, Error};
 use poise::{CodeBlockError, KeyValueArgs};
-use syn::parse_quote;
+use syn::spanned::Spanned;
 use tracing::warn;
 
 use crate::types::Context;
@@ -300,21 +300,28 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
-	let (params, code) = parse(&arguments)?;
+	let (params, mut code) = parse(&arguments)?;
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 
-	let code = 'add_no_mangle: {
-		let Ok(mut file): Result<syn::File, _> = syn::parse_str(&code) else {
-			break 'add_no_mangle code;
-		};
-		for item in &mut file.items {
-			if let syn::Item::Fn(function) = item {
-				if let syn::Visibility::Public(_) = function.vis {
-					function.attrs.push(parse_quote!(#[unsafe(no_mangle)]));
-				}
-			}
+	if let Ok(file) = syn::parse_str::<syn::File>(&code) {
+		let mut spans = vec![];
+		for item in &file.items {
+			let syn::Item::Fn(function) = item else {
+				continue;
+			};
+			let syn::Visibility::Public(_) = function.vis else {
+				continue;
+			};
+
+			// could check for existing `#[unsafe(no_mangle)]` attributes before adding it here
+			spans.push(function.span());
 		}
-		prettyplease::unparse(&file)
+
+		// iterate in reverse so that the indices dont get messed up
+		for span in spans.iter().rev() {
+			let range = span.byte_range();
+			code.insert_str(range.start, "#[unsafe(no_mangle)] ");
+		}
 	};
 
 	let godbolt_request = GodboltRequest {
