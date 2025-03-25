@@ -170,10 +170,10 @@ enum GodboltMode {
 }
 
 fn note(code: &str) -> &'static str {
-	if code.contains("#[no_mangle]") {
+	if code.contains("pub") {
 		""
 	} else {
-		"Note: only unmangled functions (`#[no_mangle] pub fn`) are shown"
+		"Note: only `pub fn` at file scope are shown"
 	}
 }
 
