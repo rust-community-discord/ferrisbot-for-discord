@@ -13,12 +13,6 @@ const USER_AGENT: &str = "kangalioo/rustbot";
 	broadcast_typing,
 	category = "Utilities"
 )]
-#[poise::command(
-	prefix_command,
-	slash_command,
-	broadcast_typing,
-	category = "Utilities"
-)]
 pub async fn man(
 	ctx: Context<'_>,
 	#[description = "Section of the man page"] section: Option<String>,
@@ -58,14 +52,6 @@ pub async fn man(
 				.title(format!("man {man_page}({section})"))
 				.description(format!("View the man page for `{man_page}` on the web"))
 				.url(&url)
-				.color(crate::types::EMBED_COLOR)
-				.footer(serenity::CreateEmbedFooter::new(
-					"Powered by manpages.debian.org",
-				))
-				.thumbnail("https://www.debian.org/logos/openlogo-nd-100.jpg")
-				.field("Section", &section, true)
-				.field("Page", &man_page, true)
-				.timestamp(serenity::Timestamp::now()),
 				.color(crate::types::EMBED_COLOR)
 				.footer(serenity::CreateEmbedFooter::new(
 					"Powered by manpages.debian.org",
