@@ -7,7 +7,12 @@ use crate::types::Context;
 
 const USER_AGENT: &str = "kangalioo/rustbot";
 
-#[poise::command(prefix_command, slash_command, category = "Utilities")]
+#[poise::command(
+	prefix_command,
+	slash_command,
+	broadcast_typing,
+	category = "Utilities"
+)]
 pub async fn man(
 	ctx: Context<'_>,
 	#[description = "Section of the man page"] section: Option<String>,
@@ -26,10 +31,12 @@ pub async fn man(
 		.await
 	{
 		if response.status() == 404 {
-			bail!("Man page not found");
+			ctx.say("Man page not found").await?;
+			return Ok(());
 		}
 	} else {
-		bail!("Failed to fetch man page");
+		ctx.say("Failed to fetch man page").await?;
+		return Ok(());
 	}
 
 	url.push_str(".html");
@@ -37,9 +44,17 @@ pub async fn man(
 	ctx.send(
 		poise::CreateReply::default().embed(
 			serenity::CreateEmbed::new()
-				.title(format!("man {section} {man_page}"))
+				.title(format!("man {section}({man_page})"))
+				.description(format!("View the man page for `{man_page}` on the web"))
 				.url(&url)
-				.color(crate::types::EMBED_COLOR),
+				.color(crate::types::EMBED_COLOR)
+				.footer(serenity::CreateEmbedFooter::new(
+					"Powered by manpages.debian.org",
+				))
+				.thumbnail("https://www.debian.org/logos/openlogo-nd-100.jpg")
+				.field("Section", &section, true)
+				.field("Page", &man_page, true)
+				.timestamp(serenity::Timestamp::now()),
 		),
 	)
 	.await?;
