@@ -169,12 +169,38 @@ enum GodboltMode {
 	Mca,
 }
 
-fn note(code: &str) -> &'static str {
-	if code.contains("pub") {
+fn note(no_mangle_added: bool) -> &'static str {
+	if no_mangle_added {
 		""
 	} else {
 		"Note: only `pub fn` at file scope are shown"
 	}
+}
+
+fn add_no_mangle(code: &mut String) -> bool {
+	let mut no_mangle_added = false;
+	if let Ok(file) = syn::parse_str::<syn::File>(code) {
+		let mut spans = vec![];
+		for item in &file.items {
+			let syn::Item::Fn(function) = item else {
+				continue;
+			};
+			let syn::Visibility::Public(_) = function.vis else {
+				continue;
+			};
+
+			// could check for existing `#[unsafe(no_mangle)]` attributes before adding it here
+			spans.push(function.span());
+			no_mangle_added = true;
+		}
+
+		// iterate in reverse so that the indices dont get messed up
+		for span in spans.iter().rev() {
+			let range = span.byte_range();
+			code.insert_str(range.start, "#[unsafe(no_mangle)] ");
+		}
+	}
+	no_mangle_added
 }
 
 async fn respond_codeblocks(
@@ -301,29 +327,8 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
+	let no_mangle_added = add_no_mangle(&mut code);
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
-
-	if let Ok(file) = syn::parse_str::<syn::File>(&code) {
-		let mut spans = vec![];
-		for item in &file.items {
-			let syn::Item::Fn(function) = item else {
-				continue;
-			};
-			let syn::Visibility::Public(_) = function.vis else {
-				continue;
-			};
-
-			// could check for existing `#[unsafe(no_mangle)]` attributes before adding it here
-			spans.push(function.span());
-		}
-
-		// iterate in reverse so that the indices dont get messed up
-		for span in spans.iter().rev() {
-			let range = span.byte_range();
-			code.insert_str(range.start, "#[unsafe(no_mangle)] ");
-		}
-	};
-
 	let godbolt_request = GodboltRequest {
 		source_code: &code,
 		rustc: &rustc,
@@ -332,7 +337,7 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code);
+	let note = note(no_mangle_added);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "x86asm", note).await
 }
 
@@ -352,7 +357,8 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
-	let (params, code) = parse(&arguments)?;
+	let (params, mut code) = parse(&arguments)?;
+	let no_mangle_added = add_no_mangle(&mut code);
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
 		source_code: &code,
@@ -363,7 +369,7 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code);
+	let note = note(no_mangle_added);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "rust", note).await
 }
 
@@ -385,7 +391,8 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
-	let (params, code) = parse(&arguments)?;
+	let (params, mut code) = parse(&arguments)?;
+	let no_mangle_added = add_no_mangle(&mut code);
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
 		source_code: &code,
@@ -395,6 +402,6 @@ pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), E
 	};
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
-	let note = note(&code);
+	let note = note(no_mangle_added);
 	respond_codeblocks(ctx, godbolt_result, godbolt_request, "llvm", note).await
 }
