@@ -2,6 +2,7 @@ use std::{collections::HashMap, mem::take};
 
 use anyhow::{anyhow, Error};
 use poise::{CodeBlockError, KeyValueArgs};
+use syn::parse_quote;
 use tracing::warn;
 
 use crate::types::Context;
@@ -301,6 +302,21 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, code) = parse(&arguments)?;
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
+
+	let code = 'add_no_mangle: {
+		let Ok(mut file): Result<syn::File, _> = syn::parse_str(&code) else {
+			break 'add_no_mangle code;
+		};
+		for item in &mut file.items {
+			if let syn::Item::Fn(function) = item {
+				if let syn::Visibility::Public(_) = function.vis {
+					function.attrs.push(parse_quote!(#[unsafe(no_mangle)]));
+				}
+			}
+		}
+		prettyplease::unparse(&file)
+	};
+
 	let godbolt_request = GodboltRequest {
 		source_code: &code,
 		rustc: &rustc,
