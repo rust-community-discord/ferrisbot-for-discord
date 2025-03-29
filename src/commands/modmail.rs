@@ -1,9 +1,10 @@
-use crate::types::{Context, Data};
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{EditThread, GuildChannel, Mentionable, UserId};
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use tracing::{debug, info};
+
+use crate::types::{Context, Data};
 
 /// Opens a modmail thread for a message. To use, right-click the message that
 /// you want to report, then go to "Apps" > "Open Modmail".
@@ -20,7 +21,7 @@ pub async fn modmail_context_menu_for_message(
 ) -> Result<(), Error> {
 	let message = format!(
 		"Message reported: {}\n\nMessage contents:\n\n{}",
-		message.link_ensured(ctx).await,
+		message.id.link(ctx.channel_id(), ctx.guild_id()),
 		message.content_safe(ctx)
 	);
 	let modmail = create_modmail_thread(ctx, message, ctx.data(), ctx.author().id).await?;
@@ -175,7 +176,7 @@ pub async fn create_modmail_thread(
 		.guild()
 		.ok_or(anyhow!("Modmail channel is not in a guild!"))?;
 
-	let modmail_name = format!("Modmail #{}", thread_rng().gen_range(1..10000));
+	let modmail_name = format!("Modmail #{}", rand::rng().random_range(1..10000));
 
 	let mut modmail_thread = modmail_channel
 		.create_thread(
