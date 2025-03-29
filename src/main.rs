@@ -12,14 +12,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
-use crate::types::Data;
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
-use rand::{seq::IteratorRandom, thread_rng, Rng};
+use rand::{seq::IteratorRandom, Rng};
 use shuttle_runtime::SecretStore;
 use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
+
+use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
+use crate::types::Data;
 
 pub mod checks;
 pub mod commands;
@@ -283,7 +284,7 @@ async fn init_server_icon_changer(
 
 	loop {
 		// Attempt to find all images and select one at random
-		let icon = icon_paths.iter().choose(&mut thread_rng());
+		let icon = icon_paths.iter().choose(&mut rand::rng());
 		if let Some(icon_path) = icon {
 			info!("Changing server icon to {:?}", icon_path);
 
@@ -301,7 +302,7 @@ async fn init_server_icon_changer(
 		}
 
 		// Sleep for between 24 and 48 hours
-		let sleep_duration = thread_rng().gen_range((60 * 60 * 24)..(60 * 60 * 48));
+		let sleep_duration = rand::rng().random_range((60 * 60 * 24)..(60 * 60 * 48));
 		tokio::time::sleep(Duration::from_secs(sleep_duration)).await;
 	}
 }
