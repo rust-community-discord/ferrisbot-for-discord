@@ -322,9 +322,27 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 /// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[implicit_fn::implicit_fn]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);
+	let hl = params
+		.get("--emit")
+		.map(match _ {
+			"llvmir" => "llvm",
+			"dep-info" | "link" | "metadata" | "obj" | "llvm-bc" => "",
+			"mir" => "rust",
+			_ => "x86asm",
+		})
+		.or(params.get("--target").map(match _.split('-').next() {
+			Some("aarch64") => "arm",
+			Some(x) if x.starts_with("arm") => "arm",
+			Some(x) if x.starts_with("mips") || x.starts_with("riscv") => "mips",
+			Some("wasm32" | "wasm64") => "wasm",
+			Some("x86_64" | _) => "x86asm",
+			None => "", // ??? (0 valid targets here)
+		}))
+		.unwrap_or("x86asm");
 	let (rustc, flags) = rustc_id_and_flags(ctx.data(), &params).await?;
 	let godbolt_request = GodboltRequest {
 		source_code: &code,
@@ -335,7 +353,7 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 	let godbolt_result = compile_rust_source(&ctx.data().http, &godbolt_request).await?;
 
 	let note = note(no_mangle_added);
-	respond_codeblocks(ctx, godbolt_result, godbolt_request, "x86asm", note).await
+	respond_codeblocks(ctx, godbolt_result, godbolt_request, hl, note).await
 }
 
 /// Run performance analysis using llvm-mca
