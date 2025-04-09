@@ -653,6 +653,8 @@ dependencies = [
  "poise",
  "rand 0.9.0",
  "reqwest 0.12.15",
+ "proc-macro2",
+ "rusttype",
  "serde",
  "serde_json",
  "shuttle-runtime",

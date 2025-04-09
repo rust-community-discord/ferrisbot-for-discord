@@ -1,7 +1,11 @@
 [package]
 name = "ferrisbot-for-discord"
 version = "0.1.0"
-authors = ["kangalioo", "technetos <mrgould93@gmail.com>", "Ivan Dardi <ivanbdardi@gmail.com>"]
+authors = [
+    "kangalioo",
+    "technetos <mrgould93@gmail.com>",
+    "Ivan Dardi <ivanbdardi@gmail.com>",
+]
 edition = "2021"
 license = "MIT"
 
@@ -17,6 +21,7 @@ tokio = "1.44"
 tracing = "0.1.41"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
 sqlx = { version = "0.8.3", features = ["runtime-tokio-native-tls", "postgres", "macros"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 image = { version = "0.25", default-features = false, features = ["png"] } # get a better computer meme rendering
