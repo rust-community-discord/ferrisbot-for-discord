@@ -12,51 +12,50 @@ use super::{
 
 const BENCH_FUNCTION: &str = r#"
 fn bench(functions: &[(&str, fn())]) {
-	const CHUNK_SIZE: usize = 1000;
+    const CHUNK_SIZE: usize = 1000;
 
-	// Warm up
-	for (_, function) in functions.iter() {
-		for _ in 0..CHUNK_SIZE {
-			(function)();
-		}
-	}
+    // Warm up
+    for (_, function) in functions.iter() {
+        for _ in 0..CHUNK_SIZE {
+            (function)();
+        }
+    }
 
-	let mut functions_chunk_times = functions.iter().map(|_| Vec::new()).collect::<Vec<_>>();
+    let mut functions_chunk_times = functions.iter().map(|_| Vec::new()).collect::<Vec<_>>();
 
-	let start = std::time::Instant::now();
-	while (start.elapsed()).as_secs() < 5 {
-		for (chunk_times, (_, function)) in functions_chunk_times.iter_mut().zip(functions) {
-			let start = std::time::Instant::now();
-			for _ in 0..CHUNK_SIZE {
-				(function)();
-			}
-			chunk_times.push(start.elapsed().as_secs_f64() / CHUNK_SIZE as f64);
-		}
-	}
+    let start = std::time::Instant::now();
+    while (std::time::Instant::now() - start).as_secs() < 5 {
+        for (chunk_times, (_, function)) in functions_chunk_times.iter_mut().zip(functions) {
+            let start = std::time::Instant::now();
+            for _ in 0..CHUNK_SIZE {
+                (function)();
+            }
+            chunk_times.push((std::time::Instant::now() - start).as_secs_f64() / CHUNK_SIZE as f64);
+        }
+    }
 
-	for (chunk_times, (function_name, _)) in functions_chunk_times.iter().zip(functions) {
-		let mean_time: f64 = chunk_times.iter().sum::<f64>() / chunk_times.len() as f64;
+    for (chunk_times, (function_name, _)) in functions_chunk_times.iter().zip(functions) {
+        let mean_time: f64 = chunk_times.iter().sum::<f64>() / chunk_times.len() as f64;
+        
+        let mut sum_of_squared_deviations = 0.0;
+        let mut n = 0;
+        for &time in chunk_times {
+            // Filter out outliers (there are some crazy outliers, I've checked)
+            if time < mean_time * 3.0 {
+                sum_of_squared_deviations += (time - mean_time).powi(2);
+                n += 1;
+            }
+        }
+        let standard_deviation = f64::sqrt(sum_of_squared_deviations / n as f64);
 
-		let mut sum_of_squared_deviations = 0.0;
-		let mut n = 0;
-		for &time in chunk_times {
-			// Filter out outliers (there are some crazy outliers, I've checked)
-			if time < mean_time * 3.0 {
-				sum_of_squared_deviations += (time - mean_time).powi(2);
-				n += 1;
-			}
-		}
-		let standard_deviation = f64::sqrt(sum_of_squared_deviations / n as f64);
-
-		println!(
-			"{}: {:.1}ns ± {:.1}",
-			function_name,
-			mean_time * 1_000_000_000.0,
-			standard_deviation * 1_000_000_000.0,
-		);
-	}
-}
-"#;
+        println!(
+            "{}: {:.1}ns ± {:.1}",
+            function_name,
+            mean_time * 1_000_000_000.0,
+            standard_deviation * 1_000_000_000.0,
+        );
+    }
+}"#;
 
 /// Benchmark small snippets of code
 #[poise::command(
@@ -100,9 +99,9 @@ pub async fn microbench(
 	after_code += "fn main() {\nbench(&[";
 	for function_name in pub_fn_names {
 		after_code += "(\"";
-		after_code += &function_name;
+		after_code += function_name;
 		after_code += "\", ";
-		after_code += &function_name;
+		after_code += function_name;
 		after_code += "), ";
 	}
 	after_code += "]);\n}\n";
