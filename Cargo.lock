@@ -755,6 +755,7 @@ dependencies = [
  "imageproc",
  "itertools 0.12.1",
  "poise",
+ "proc-macro2",
  "rand 0.8.5",
  "reqwest",
  "rusttype",
