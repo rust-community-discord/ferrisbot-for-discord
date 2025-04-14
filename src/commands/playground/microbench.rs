@@ -77,7 +77,7 @@ pub async fn microbench(
 	// insert convenience import for users
 	let after_crate_attrs = "#[allow(unused_imports)] use std::hint::black_box;\n";
 
-	let pub_fn_names: Vec<&str> = extract_pub_fn_names_from_user_code(user_code);
+	let pub_fn_names: Vec<String> = extract_pub_fn_names_from_user_code(user_code);
 	match pub_fn_names.len() {
 		0 => {
 			ctx.say("No public functions (`pub fn`) found for benchmarking :thinking:")
@@ -99,9 +99,9 @@ pub async fn microbench(
 	after_code += "fn main() {\nbench(&[";
 	for function_name in pub_fn_names {
 		after_code += "(\"";
-		after_code += function_name;
+		after_code += &function_name;
 		after_code += "\", ";
-		after_code += function_name;
+		after_code += &function_name;
 		after_code += "), ";
 	}
 	after_code += "]);\n}\n";
@@ -163,114 +163,25 @@ pub fn mul() {
 	})
 }
 
-fn extract_pub_fn_names_from_user_code(s: &str) -> Vec<&str> {
-	let mut buf = vec![];
-	let mut indent_level: u32 = 0;
+use syn::{parse_file, Item, ItemFn, Visibility};
 
-	let mut in_string = false;
-	let mut in_char = false;
-	let mut in_line_comment = false;
-	let mut in_block_comment = false;
-	let mut escape_next = false;
+fn extract_pub_fn_names_from_user_code(code: &str) -> Vec<String> {
+	let file = match parse_file(code) {
+		Ok(file) => file,
+		Err(_) => return vec![],
+	};
 
-	for (i, c) in s.char_indices() {
-		if escape_next {
-			escape_next = false;
-			continue;
-		}
-
-		if (in_string || in_char) && c == '\\' {
-			escape_next = true;
-			continue;
-		}
-
-		if c == '"' && !in_line_comment && !in_block_comment && !in_char {
-			in_string = !in_string;
-			continue;
-		}
-
-		if c == '\'' && !in_line_comment && !in_block_comment && !in_string {
-			in_char = !in_char;
-			continue;
-		}
-
-		if !in_string && !in_char && !in_line_comment && !in_block_comment && c == '/' {
-			if i + 1 < s.len() {
-				if let Some(next_char) = s[i + 1..].chars().next() {
-					if next_char == '/' {
-						in_line_comment = true;
-						continue;
-					} else if next_char == '*' {
-						in_block_comment = true;
-						continue;
-					}
+	file.items
+		.iter()
+		.filter_map(|item| {
+			if let Item::Fn(ItemFn { vis, sig, .. }) = item {
+				if matches!(vis, Visibility::Public(_)) {
+					return Some(sig.ident.to_string());
 				}
 			}
-		}
-
-		if in_line_comment && (c == '\n' || c == '\r') {
-			in_line_comment = false;
-			continue;
-		}
-
-		if in_block_comment && c == '*' {
-			if i + 1 < s.len() {
-				if let Some(next_char) = s[i + 1..].chars().next() {
-					if next_char == '/' {
-						in_block_comment = false;
-						continue;
-					}
-				}
-			}
-		}
-
-		if !in_string && !in_char && !in_line_comment && !in_block_comment {
-			if c == '{' {
-				indent_level += 1;
-			} else if c == '}' {
-				indent_level = indent_level.saturating_sub(1);
-			} else if c == 'p' && s[i..].starts_with("pub") && indent_level == 0 {
-				let after_pub = &s[i + 3..];
-
-				let Some(pos_of_fn) = after_pub.find("fn") else {
-					continue;
-				};
-
-				let between_pub_fn = &after_pub[..pos_of_fn];
-				if !between_pub_fn.chars().all(|c| c.is_whitespace()) {
-					continue;
-				}
-
-				let after_fn = &after_pub[pos_of_fn + 2..];
-
-				let name_start = after_fn.find(|c: char| c.is_alphanumeric() || c == '_');
-				let Some(name_start) = name_start else {
-					continue;
-				};
-
-				let name_end_offset =
-					after_fn[name_start..].find(|c: char| !(c.is_alphanumeric() || c == '_'));
-				let name_end = match name_end_offset {
-					Some(offset) => name_start + offset,
-					None => after_fn.len(),
-				};
-
-				let fn_name = &after_fn[name_start..name_end];
-
-				let after_name = &after_fn[name_end..];
-				let paren_pos = after_name.find('(');
-
-				if let Some(paren_pos) = paren_pos {
-					let between_name_paren = &after_name[..paren_pos];
-					if between_name_paren.chars().all(|c| c.is_whitespace()) {
-						buf.push(fn_name);
-					}
-				}
-			}
-		}
-	}
-
-	buf
+			None
+		})
+		.collect()
 }
 
 #[cfg(test)]
@@ -281,7 +192,9 @@ mod tests {
 	fn test_raw_string_with_braces() {
 		let code = r##"
             pub fn valid_function() {}
-            let s = r#"pub fn fake_function() {}"#;
+            fn helper() {
+                let s = r#"pub fn fake_function() {}"#;
+            }
             pub fn another_valid_function() {}
         "##;
 		assert_eq!(
@@ -321,9 +234,13 @@ mod tests {
 	#[test]
 	fn test_string_literals_with_function_declarations() {
 		let code = r#"
-            let s = "pub fn fake_function() {}";
+            fn helper1() {
+                let s = "pub fn fake_function() {}";
+            }
             pub fn real_function() {}
-            let complex = "nested \"pub fn also_fake() {}\" string";
+            fn helper2() {
+                let complex = "nested \"pub fn also_fake() {}\" string";
+            }
             pub fn another_real_function() {}
         "#;
 		assert_eq!(
@@ -389,7 +306,9 @@ mod tests {
             struct Republic;
             fn republic_function() {}
             pub fn actual_function() {}
-            let republic = Republic;
+            fn other_fn() {
+                let republic = 1;
+            }
             fn public_but_not_pub() {}
             pub fn another() {}
         "#;
@@ -402,9 +321,11 @@ mod tests {
 	#[test]
 	fn test_escaped_quotes_and_special_chars() {
 		let code = r#"
-            let s = "escaped quote \"pub fn fake() {}\"";
+            fn helper() {
+                let s = "escaped quote \"pub fn fake() {}\"";
+                let t = "backslash \\ pub fn also_fake() {}";
+            }
             pub fn real_function() {}
-            let t = "backslash \\ pub fn also_fake() {}";
             pub fn another_real_function() {}
         "#;
 		assert_eq!(
@@ -415,22 +336,41 @@ mod tests {
 
 	#[test]
 	fn test_complex_nested_structures() {
-		let code = r#"
+		let code = r##"
             pub fn outer() {
                 { { { 
                     // deeply nested
                     pub fn inner() {} // this shouldn't be found
-                } } }
-                "{{{}}}" // braces in string
+                } } };
+                fn inner_fn() {
+                    let s = "{{{}}}" ; // braces in string
+                }
                 /* { pub fn in_comment() {} } */
             }
             pub fn another() {
-                r#"raw string with { pub fn fake() {} };
+                fn inner_helper() {
+                    let rs = r#"raw string with { pub fn fake() {} }"#;
+                }
             }
-        "#;
+        "##;
 		assert_eq!(
 			extract_pub_fn_names_from_user_code(code),
 			vec!["outer", "another"]
+		);
+	}
+
+	#[test]
+	fn test_raw_string_literal_with_quotes() {
+		let code = r##"
+			pub fn valid_function() {}
+			fn example() {
+				let s = r#"pub fn "fake_function"() {}"#;
+			}
+			pub fn another_valid_function() {}
+		"##;
+		assert_eq!(
+			extract_pub_fn_names_from_user_code(code),
+			vec!["valid_function", "another_valid_function"]
 		);
 	}
 }
