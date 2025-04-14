@@ -93,8 +93,6 @@ pub async fn microbench(
 		_ => {}
 	};
 
-	//
-
 	// insert this after user code
 	let mut after_code = BENCH_FUNCTION.to_owned();
 	after_code += "fn main() {\nbench(&[";
