@@ -99,11 +99,7 @@ pub async fn microbench(
 	let mut after_code = BENCH_FUNCTION.to_owned();
 	after_code += "fn main() {\nbench(&[";
 	for function_name in pub_fn_names {
-		after_code += "(\"";
-		after_code += &function_name;
-		after_code += "\", ";
-		after_code += &function_name;
-		after_code += "), ";
+		after_code += &format!("(\"{function_name}\", {function_name}),\n");
 	}
 	after_code += "]);\n}\n";
 
