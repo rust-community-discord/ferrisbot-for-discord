@@ -1,4 +1,5 @@
 use anyhow::Error;
+use syn::{parse_file, Item, ItemFn, Visibility};
 
 use crate::types::Context;
 
@@ -77,8 +78,8 @@ pub async fn microbench(
 	// insert convenience import for users
 	let after_crate_attrs = "#[allow(unused_imports)] use std::hint::black_box;\n";
 
-	let pub_fn_indices = user_code.match_indices("pub fn ").collect::<Vec<_>>();
-	match pub_fn_indices.len() {
+	let pub_fn_names: Vec<String> = extract_pub_fn_names_from_user_code(user_code);
+	match pub_fn_names.len() {
 		0 => {
 			ctx.say("No public functions (`pub fn`) found for benchmarking :thinking:")
 				.await?;
@@ -95,15 +96,8 @@ pub async fn microbench(
 	// insert this after user code
 	let mut after_code = BENCH_FUNCTION.to_owned();
 	after_code += "fn main() {\nbench(&[";
-	for (index, _) in pub_fn_indices {
-		let function_name_start = index + "pub fn ".len();
-		let function_name_end = match user_code[function_name_start..].find('(') {
-			Some(x) => x + function_name_start,
-			None => continue,
-		};
-		let function_name = user_code[function_name_start..function_name_end].trim();
-
-		after_code += &format!("(\"{function_name}\", {function_name}), ");
+	for function_name in pub_fn_names {
+		after_code += &format!("(\"{function_name}\", {function_name}),\n");
 	}
 	after_code += "]);\n}\n";
 
@@ -162,4 +156,23 @@ pub fn mul() {
 }
 ",
 	})
+}
+
+fn extract_pub_fn_names_from_user_code(code: &str) -> Vec<String> {
+	let file = match parse_file(code) {
+		Ok(file) => file,
+		Err(_) => return vec![],
+	};
+
+	file.items
+		.iter()
+		.filter_map(|item| {
+			if let Item::Fn(ItemFn { vis, sig, .. }) = item {
+				if matches!(vis, Visibility::Public(_)) {
+					return Some(sig.ident.to_string());
+				}
+			}
+			None
+		})
+		.collect()
 }
