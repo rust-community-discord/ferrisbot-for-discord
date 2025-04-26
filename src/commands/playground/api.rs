@@ -31,6 +31,7 @@ pub struct PlaygroundRequest<'a> {
 #[derive(Debug, Serialize)]
 pub struct MiriRequest<'a> {
 	pub edition: Edition,
+	#[serde(rename = "aliasingModel")]
 	pub aliasing_model: AliasingModel,
 	pub code: &'a str,
 }
