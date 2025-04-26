@@ -44,6 +44,7 @@ pub async fn miri(
 		.json(&MiriRequest {
 			code,
 			edition: flags.edition,
+			aliasing_model: flags.aliasing_model,
 		})
 		.send()
 		.await?
@@ -70,6 +71,7 @@ pub fn miri_help() -> String {
 		// Playgrounds sends miri warnings/errors and output in the same field so we can't filter
 		// warnings out
 		warn: false,
+		aliasing_model: true,
 		run: false,
 		example_code: "code",
 	})
@@ -135,6 +137,7 @@ pub fn expand_help() -> String {
 		mode_and_channel: false,
 		warn: false,
 		run: false,
+		aliasing_model: false,
 		example_code: "code",
 	})
 }
@@ -203,6 +206,7 @@ pub fn clippy_help() -> String {
 		mode_and_channel: false,
 		warn: false,
 		run: false,
+		aliasing_model: false,
 		example_code: "code",
 	})
 }
@@ -241,6 +245,7 @@ pub fn fmt_help() -> String {
 		desc: "Format code using rustfmt",
 		mode_and_channel: false,
 		warn: false,
+		aliasing_model: false,
 		run: false,
 		example_code: "code",
 	})

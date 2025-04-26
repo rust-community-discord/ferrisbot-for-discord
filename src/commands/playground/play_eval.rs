@@ -77,6 +77,7 @@ pub fn play_help() -> String {
 		mode_and_channel: true,
 		warn: true,
 		run: false,
+		aliasing_model: false,
 		example_code: "code",
 	})
 }
@@ -104,6 +105,7 @@ pub fn playwarn_help() -> String {
 		mode_and_channel: true,
 		warn: false,
 		run: false,
+		aliasing_model: false,
 		example_code: "code",
 	})
 }
@@ -131,6 +133,7 @@ pub fn eval_help() -> String {
 		mode_and_channel: true,
 		warn: true,
 		run: false,
+		aliasing_model: false,
 		example_code: "code",
 	})
 }

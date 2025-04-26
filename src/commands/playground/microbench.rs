@@ -153,6 +153,7 @@ that should be opaque to the optimizer: `number * 2` produces optimized integer 
 		mode_and_channel: false,
 		warn: true,
 		run: false,
+		aliasing_model: false,
 		example_code: "
 pub fn add() {
     black_box(black_box(42.0) + black_box(99.0));

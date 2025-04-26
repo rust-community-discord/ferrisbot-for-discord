@@ -112,6 +112,7 @@ proc-macro code, and one for the usage code which can refer to the proc-macro cr
 		mode_and_channel: false,
 		warn: true,
 		run: true,
+		aliasing_model: false,
 		example_code: "
 #[proc_macro]
 pub fn foo(_: proc_macro::TokenStream) -> proc_macro::TokenStream {
