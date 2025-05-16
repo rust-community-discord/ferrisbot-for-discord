@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use anyhow::{anyhow, Error};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Timestamp;
+use rand::Rng;
 
 use crate::types::Context;
 
@@ -14,8 +15,7 @@ use crate::types::Context;
 	discard_spare_arguments
 )]
 pub async fn go(ctx: Context<'_>) -> Result<(), Error> {
-	use rand::Rng as _;
-	if rand::thread_rng().gen_bool(0.01) {
+	if rand::rng().random_bool(0.01) {
 		ctx.say("Yes").await?;
 	} else {
 		ctx.say("No").await?;
@@ -111,15 +111,15 @@ pub async fn conradluget(
 	text: String,
 ) -> Result<(), Error> {
 	static BASE_IMAGE: LazyLock<image::DynamicImage> = LazyLock::new(|| {
-		image::io::Reader::with_format(
+		image::ImageReader::with_format(
 			std::io::Cursor::new(&include_bytes!("../../assets/conrad.png")[..]),
 			image::ImageFormat::Png,
 		)
 		.decode()
 		.expect("failed to load image")
 	});
-	static FONT: LazyLock<rusttype::Font<'_>> = LazyLock::new(|| {
-		rusttype::Font::try_from_bytes(include_bytes!("../../assets/OpenSans.ttf"))
+	static FONT: LazyLock<ab_glyph::FontRef<'_>> = LazyLock::new(|| {
+		ab_glyph::FontRef::try_from_slice(include_bytes!("../../assets/OpenSans.ttf"))
 			.expect("failed to load font")
 	});
 
@@ -129,15 +129,15 @@ pub async fn conradluget(
 		image::Rgba([201, 209, 217, 255]),
 		57,
 		286,
-		rusttype::Scale::uniform(65.0),
-		&FONT,
+		65.0,
+		&*FONT,
 		&text,
 	);
 
 	let mut img_bytes = Vec::with_capacity(200_000); // preallocate 200kB for the img
 	image::DynamicImage::ImageRgba8(image).write_to(
 		&mut std::io::Cursor::new(&mut img_bytes),
-		image::ImageOutputFormat::Png,
+		image::ImageFormat::Png,
 	)?;
 
 	let filename = text + ".png";
