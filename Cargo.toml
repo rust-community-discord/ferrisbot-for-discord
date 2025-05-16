@@ -38,4 +38,5 @@ ab_glyph = { version = "0.2", default-features = false } # interact with imagepr
 rand = "0.9"
 syn = { version = "2.0.100", features = ["full"] }
 itertools = "0.14"
+futures = "0.3.31"
 proc-macro2 = { version = "1.0.94", features = ["span-locations"] }

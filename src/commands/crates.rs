@@ -1,11 +1,16 @@
 use anyhow::Result;
 use anyhow::{anyhow, bail};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use reqwest::header;
 use serde::Deserialize;
 use tracing::info;
 
 use crate::serenity;
 use crate::types::Context;
+
+#[cfg(test)]
+mod tests;
 
 const USER_AGENT: &str = "kangalioo/rustbot";
 
@@ -160,17 +165,35 @@ pub async fn crate_(
 
 /// Returns whether the given type name is the one of a primitive.
 #[rustfmt::skip]
-fn is_in_std(name: &str) -> bool {
-	name.chars().next().is_some_and(char::is_uppercase)
-		|| matches!(
-            name,
-            "f32" | "f64"
-                | "i8" | "i16" | "i32" | "i64" | "i128" | "isize"
-                | "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
-                | "char" | "str"
-                | "pointer" | "reference" | "fn"
-                | "bool" | "slice" | "tuple" | "unit" | "array"
-        )
+fn is_in_std(name: &str) -> IsInStd<'_> {
+	match name {
+		"f32" | "f64"
+			| "i8" | "i16" | "i32" | "i64" | "i128" | "isize"
+			| "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
+			| "char" | "str"
+			| "pointer" | "reference" | "fn"
+			| "bool" | "slice" | "tuple" | "unit" | "array"
+		=> IsInStd::Primitive,
+		"f16" | "f128" | "never" => IsInStd::PrimitiveNightly,
+		"Self" => IsInStd::Keyword("SelfTy"), // special case: SelfTy is not a real keyword
+		"SelfTy"
+			| "as" | "async" | "await" | "break" | "const" | "continue" | "crate" | "dyn" | "else" | "enum" | "extern" | "false"
+			| "for" | "if" | "impl" | "in" | "let" | "loop" | "match" | "mod" | "move" | "mut" | "pub" | "ref" | "return"
+			| "self" | "static" | "struct" | "super" | "trait" | "true" | "type" | "union" | "unsafe" | "use" | "where" | "while"
+			// omitted "fn" due to duplicate
+		=> IsInStd::Keyword(name),
+		name if name.chars().next().is_some_and(char::is_uppercase) => IsInStd::PossibleType,
+		_ => IsInStd::False
+	}
+}
+
+#[derive(Debug)]
+enum IsInStd<'a> {
+	PossibleType,
+	Primitive,
+	PrimitiveNightly,
+	Keyword(&'a str),
+	False,
 }
 
 /// Provide the documentation link to an official Rust crate (e.g. std, alloc, nightly)
@@ -206,26 +229,225 @@ pub async fn doc(
 	ctx: Context<'_>,
 	#[description = "Path of the crate and item to lookup"] query: String,
 ) -> Result<()> {
-	let mut query_iter = query.splitn(2, "::");
-	let first_path_element = query_iter.next().unwrap();
-
-	let mut doc_url = if let Some(rustc_crate) = rustc_crate_link(first_path_element) {
-		rustc_crate.to_owned()
-	} else if first_path_element.is_empty() || is_in_std(first_path_element) {
-		"https://doc.rust-lang.org/stable/std/".to_owned()
-	} else {
-		get_documentation(&get_crate(&ctx.data().http, first_path_element).await?)
-	};
-
-	if is_in_std(first_path_element) {
-		doc_url += "?search=";
-		doc_url += &query;
-	} else if let Some(item_path) = query_iter.next() {
-		doc_url += "?search=";
-		doc_url += item_path;
-	}
-
-	ctx.say(doc_url).await?;
+	ctx.say(path_to_doc_url(&query, &ctx.data().http).await?)
+		.await?;
 
 	Ok(())
+}
+
+async fn path_to_doc_url(query: &str, client: &impl DocsClient) -> Result<String> {
+	use std::fmt::Write;
+
+	let mut path = split_qualified_path(query);
+
+	if path.ident.is_none() {
+		// no `::`, possible ident from std
+		match is_in_std(path.crate_) {
+			IsInStd::Primitive => {
+				path = QualifiedPath {
+					kind: Some("primitive"),
+					crate_: "std",
+					ident: Some(path.crate_),
+					mods: "",
+				};
+			}
+			IsInStd::PrimitiveNightly => {
+				path = QualifiedPath {
+					kind: Some("primitive"),
+					crate_: "nightly",
+					ident: Some(path.crate_),
+					mods: "",
+				};
+			}
+			IsInStd::Keyword(ident) => {
+				path = QualifiedPath {
+					kind: Some("keyword"),
+					crate_: "std",
+					ident: Some(ident),
+					mods: "",
+				};
+			}
+			IsInStd::PossibleType => {
+				path = QualifiedPath {
+					kind: path.kind,
+					crate_: "std",
+					ident: Some(path.crate_),
+					mods: "",
+				};
+			}
+			IsInStd::False => {}
+		}
+	}
+
+	let (is_rustc_crate, mut doc_url, root_len) =
+		if let Some(prefix) = rustc_crate_link(path.crate_) {
+			(true, prefix.to_owned(), prefix.len())
+		} else {
+			let mut prefix = client.get_crate_docs(path.crate_).await?;
+			let root_len = prefix.len();
+
+			if !prefix.ends_with('/') {
+				prefix += "/";
+			}
+			write!(prefix, "latest/{}/", path.crate_.replace('-', "_")).unwrap();
+			(false, prefix, root_len)
+		};
+
+	if let Some(ident) = path.ident {
+		for segment in path.mods.split("::") {
+			if !segment.is_empty() {
+				doc_url += segment;
+				doc_url += "/";
+			}
+		}
+
+		let kind = if let Some(kind) = path.kind {
+			Some(kind)
+		} else {
+			guess_kind(client, &doc_url, is_rustc_crate, ident).await
+		};
+
+		match kind {
+			Some("" | "mod") => write!(doc_url, "{ident}/index.html").unwrap(),
+			Some(kind) => write!(doc_url, "{kind}.{ident}.html").unwrap(),
+			None => {
+				doc_url.truncate(root_len);
+				doc_url += "?search=";
+				if !path.mods.is_empty() {
+					doc_url += path.mods;
+					doc_url += "::";
+				}
+				doc_url += ident;
+			}
+		}
+	} else {
+		doc_url.truncate(root_len);
+	}
+
+	Ok(doc_url)
+}
+
+fn split_qualified_path(input: &str) -> QualifiedPath<'_> {
+	let (kind, path) = match input.split_once('@') {
+		Some((kind, rest)) => (Some(kind), rest),
+		None => (None, input),
+	};
+
+	let Some((crate_, rest)) = path.split_once("::") else {
+		return QualifiedPath {
+			kind,
+			crate_: path,
+			ident: None,
+			mods: "",
+		};
+	};
+	match rest.rsplit_once("::") {
+		Some((mods, ident)) => QualifiedPath {
+			kind,
+			crate_,
+			ident: Some(ident),
+			mods,
+		},
+		None => QualifiedPath {
+			kind,
+			crate_,
+			ident: Some(rest),
+			mods: "",
+		},
+	}
+}
+
+#[derive(Debug)]
+struct QualifiedPath<'a> {
+	kind: Option<&'a str>,
+	crate_: &'a str,
+	ident: Option<&'a str>,
+	mods: &'a str,
+}
+
+// Reference rust/src/tools/rust-analyzer/crates/ide/src/doc_links.rs for an exhaustive list
+const SNAKE_CASE_KINDS: &[&str] = &["fn", "macro", "mod"];
+const UPPER_CAMEL_CASE_KINDS: &[&str] = &[
+	"struct",
+	"enum",
+	"union",
+	"trait",
+	"traitalias",
+	"type",
+	"derive",
+];
+const SCREAMING_SNAKE_CASE_KINDS: &[&str] = &["constant", "static"];
+const RUSTC_CRATE_ONLY_KINDS: &[&str] = &["keyword", "primitive"];
+
+async fn guess_kind(
+	client: &impl DocsClient,
+	prefix: &str,
+	is_rustc_crate: bool,
+	ident: &str,
+) -> Option<&'static str> {
+	let mut attempt_order: Vec<&[&'static str]> =
+		if ident.chars().next().is_some_and(char::is_lowercase) {
+			vec![
+				SNAKE_CASE_KINDS,
+				UPPER_CAMEL_CASE_KINDS,
+				SCREAMING_SNAKE_CASE_KINDS,
+			]
+		} else if ident.chars().all(char::is_uppercase) {
+			vec![
+				SCREAMING_SNAKE_CASE_KINDS,
+				UPPER_CAMEL_CASE_KINDS,
+				SNAKE_CASE_KINDS,
+			]
+		} else {
+			vec![
+				UPPER_CAMEL_CASE_KINDS,
+				SCREAMING_SNAKE_CASE_KINDS,
+				SNAKE_CASE_KINDS,
+			]
+		};
+	if is_rustc_crate {
+		attempt_order.insert(1, RUSTC_CRATE_ONLY_KINDS);
+	}
+
+	for class in attempt_order {
+		let results = class
+			.iter()
+			.map(|&kind| async move {
+				let url = if kind == "mod" {
+					format!("{prefix}{ident}/index.html")
+				} else {
+					format!("{prefix}{kind}.{ident}.html")
+				};
+				client.page_exists(&url).await.then_some(kind)
+			})
+			.collect::<FuturesUnordered<_>>()
+			.filter_map(|result| async move { result });
+		futures::pin_mut!(results);
+		if let Some(kind) = results.next().await {
+			return Some(kind);
+		}
+	}
+
+	None
+}
+
+trait DocsClient {
+	async fn get_crate_docs(&self, crate_name: &str) -> Result<String>;
+	async fn page_exists(&self, url: &str) -> bool;
+}
+
+impl DocsClient for reqwest::Client {
+	async fn get_crate_docs(&self, crate_name: &str) -> Result<String> {
+		get_crate(self, crate_name)
+			.await
+			.map(|crate_| get_documentation(&crate_))
+	}
+
+	async fn page_exists(&self, url: &str) -> bool {
+		self.head(url)
+			.header(header::USER_AGENT, USER_AGENT)
+			.send()
+			.await
+			.is_ok_and(|resp| resp.status() == reqwest::StatusCode::OK)
+	}
 }
