@@ -650,6 +650,7 @@ dependencies = [
  "futures",
  "image",
  "imageproc",
+ "implicit-fn",
  "itertools 0.14.0",
  "poise",
  "proc-macro2",
@@ -1369,6 +1370,17 @@ dependencies = [
  "num",
  "rand 0.8.5",
  "rand_distr",
+]
+
+[[package]]
+name = "implicit-fn"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "837f3904739ddc022e28e667c09a2118bd7480c79a771e90f79d56d1db7b36cd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
 ]
 
 [[package]]
