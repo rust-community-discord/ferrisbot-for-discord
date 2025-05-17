@@ -58,6 +58,7 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	(flags, errors)
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 pub struct GenericHelp<'a> {
 	pub command: &'a str,

@@ -91,7 +91,7 @@ pub async fn microbench(
 			return Ok(());
 		}
 		_ => {}
-	};
+	}
 
 	// insert this after user code
 	let mut after_code = BENCH_FUNCTION.to_owned();
@@ -160,9 +160,8 @@ pub fn mul() {
 }
 
 fn extract_pub_fn_names_from_user_code(code: &str) -> Vec<String> {
-	let file = match parse_file(code) {
-		Ok(file) => file,
-		Err(_) => return vec![],
+	let Ok(file) = parse_file(code) else {
+		return vec![];
 	};
 
 	file.items

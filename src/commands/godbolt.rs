@@ -233,7 +233,7 @@ async fn respond_codeblocks(
 			)
 			.await?;
 		}
-	};
+	}
 	Ok(())
 }
 
