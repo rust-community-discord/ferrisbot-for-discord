@@ -30,6 +30,7 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 		edition: api::Edition::E2024,
 		warn: false,
 		run: false,
+		aliasing_model: api::AliasingModel::Stacked,
 	};
 
 	macro_rules! pop_flag {
@@ -48,6 +49,7 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	pop_flag!("edition", flags.edition);
 	pop_flag!("warn", flags.warn);
 	pop_flag!("run", flags.run);
+	pop_flag!("aliasing_model", flags.aliasing_model);
 
 	for (remaining_flag, _) in args.0 {
 		errors += &format!("unknown flag `{remaining_flag}`\n");
@@ -63,6 +65,7 @@ pub struct GenericHelp<'a> {
 	pub mode_and_channel: bool,
 	pub warn: bool,
 	pub run: bool,
+	pub aliasing_model: bool,
 	pub example_code: &'a str,
 }
 
@@ -78,6 +81,9 @@ pub fn generic_help(spec: GenericHelp<'_>) -> String {
 		reply += " mode={} channel={}";
 	}
 	reply += " edition={}";
+	if spec.aliasing_model {
+		reply += " aliasing_model={}";
+	}
 	if spec.warn {
 		reply += " warn={}";
 	}
@@ -92,6 +98,9 @@ pub fn generic_help(spec: GenericHelp<'_>) -> String {
 	if spec.mode_and_channel {
 		reply += "- mode: debug, release (default: debug)\n";
 		reply += "- channel: stable, beta, nightly (default: nightly)\n";
+	}
+	if spec.aliasing_model {
+		reply += "- aliasing_model: stacked, tree (default: stacked)\n";
 	}
 	reply += "- edition: 2015, 2018, 2021, 2024 (default: 2024)\n";
 	if spec.warn {

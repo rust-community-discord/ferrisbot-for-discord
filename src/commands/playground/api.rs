@@ -14,6 +14,7 @@ pub struct CommandFlags {
 	pub edition: Edition,
 	pub warn: bool,
 	pub run: bool,
+	pub aliasing_model: AliasingModel,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,11 +31,16 @@ pub struct PlaygroundRequest<'a> {
 #[derive(Debug, Serialize)]
 pub struct MiriRequest<'a> {
 	pub edition: Edition,
+	#[serde(rename = "aliasingModel")]
+	pub aliasing_model: AliasingModel,
 	pub code: &'a str,
 }
 
-// has the same fields
-pub type MacroExpansionRequest<'a> = MiriRequest<'a>;
+#[derive(Debug, Serialize)]
+pub struct MacroExpansionRequest<'a> {
+	pub edition: Edition,
+	pub code: &'a str,
+}
 
 #[derive(Debug, Serialize)]
 pub struct ClippyRequest<'a> {
@@ -183,6 +189,25 @@ impl FromStr for Mode {
 			"release" => Ok(Mode::Release),
 			_ => bail!("invalid compilation mode `{}`", s),
 		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AliasingModel {
+	Stacked,
+	Tree,
+}
+
+impl FromStr for AliasingModel {
+	type Err = Error;
+
+	fn from_str(s: &str) -> Result<Self, Error> {
+		Ok(match s {
+			"stacked" => AliasingModel::Stacked,
+			"tree" => AliasingModel::Tree,
+			_ => bail!("invalid aliasing model `{}`", s),
+		})
 	}
 }
 
