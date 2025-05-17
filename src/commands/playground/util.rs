@@ -1,3 +1,4 @@
+use core::fmt::Write as _;
 use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
@@ -38,7 +39,9 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 			if let Some(flag) = args.0.remove($flag_name) {
 				match flag.parse() {
 					Ok(x) => $flag_field = x,
-					Err(e) => errors += &format!("{}\n", e),
+					Err(e) => {
+						writeln!(errors, "{e}").expect("Writing to a String should never fail")
+					}
 				}
 			}
 		};
@@ -52,7 +55,8 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	pop_flag!("aliasingModel", flags.aliasing_model);
 
 	for (remaining_flag, _) in args.0 {
-		errors += &format!("unknown flag `{remaining_flag}`\n");
+		writeln!(errors, "unknown flag `{remaining_flag}`")
+			.expect("Writing to a String should never fail");
 	}
 
 	(flags, errors)

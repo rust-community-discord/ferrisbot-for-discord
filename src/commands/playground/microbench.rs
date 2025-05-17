@@ -1,4 +1,5 @@
 use anyhow::Error;
+use core::fmt::Write as _;
 use syn::{parse_file, Item, ItemFn, Visibility};
 
 use crate::types::Context;
@@ -97,7 +98,8 @@ pub async fn microbench(
 	let mut after_code = BENCH_FUNCTION.to_owned();
 	after_code += "fn main() {\nbench(&[";
 	for function_name in pub_fn_names {
-		after_code += &format!("(\"{function_name}\", {function_name}),\n");
+		writeln!(after_code, "(\"{function_name}\", {function_name}),")
+			.expect("Writing to a String should never fail");
 	}
 	after_code += "]);\n}\n";
 
