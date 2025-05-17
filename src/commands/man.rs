@@ -21,7 +21,7 @@ pub async fn man(
 	let section = section.unwrap_or_else(|| "1".to_owned());
 
 	// Make sure that the section is a valid number
-	if !section.parse::<u8>().is_ok() {
+	if section.parse::<u8>().is_err() {
 		bail!("Invalid section number");
 	}
 

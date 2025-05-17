@@ -1,4 +1,5 @@
 use anyhow::Error;
+use core::fmt::Write as _;
 use syn::{parse_file, Item, ItemFn, Visibility};
 
 use crate::types::Context;
@@ -91,13 +92,14 @@ pub async fn microbench(
 			return Ok(());
 		}
 		_ => {}
-	};
+	}
 
 	// insert this after user code
 	let mut after_code = BENCH_FUNCTION.to_owned();
 	after_code += "fn main() {\nbench(&[";
 	for function_name in pub_fn_names {
-		after_code += &format!("(\"{function_name}\", {function_name}),\n");
+		writeln!(after_code, "(\"{function_name}\", {function_name}),")
+			.expect("Writing to a String should never fail");
 	}
 	after_code += "]);\n}\n";
 
@@ -160,9 +162,8 @@ pub fn mul() {
 }
 
 fn extract_pub_fn_names_from_user_code(code: &str) -> Vec<String> {
-	let file = match parse_file(code) {
-		Ok(file) => file,
-		Err(_) => return vec![],
+	let Ok(file) = parse_file(code) else {
+		return vec![];
 	};
 
 	file.items

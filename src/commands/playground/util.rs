@@ -1,3 +1,4 @@
+use core::fmt::Write as _;
 use std::borrow::Cow;
 
 use poise::serenity_prelude as serenity;
@@ -38,7 +39,9 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 			if let Some(flag) = args.0.remove($flag_name) {
 				match flag.parse() {
 					Ok(x) => $flag_field = x,
-					Err(e) => errors += &format!("{}\n", e),
+					Err(e) => {
+						writeln!(errors, "{e}").expect("Writing to a String should never fail")
+					}
 				}
 			}
 		};
@@ -49,15 +52,17 @@ pub fn parse_flags(mut args: poise::KeyValueArgs) -> (api::CommandFlags, String)
 	pop_flag!("edition", flags.edition);
 	pop_flag!("warn", flags.warn);
 	pop_flag!("run", flags.run);
-	pop_flag!("aliasing_model", flags.aliasing_model);
+	pop_flag!("aliasingModel", flags.aliasing_model);
 
 	for (remaining_flag, _) in args.0 {
-		errors += &format!("unknown flag `{remaining_flag}`\n");
+		writeln!(errors, "unknown flag `{remaining_flag}`")
+			.expect("Writing to a String should never fail");
 	}
 
 	(flags, errors)
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 pub struct GenericHelp<'a> {
 	pub command: &'a str,
@@ -82,7 +87,7 @@ pub fn generic_help(spec: GenericHelp<'_>) -> String {
 	}
 	reply += " edition={}";
 	if spec.aliasing_model {
-		reply += " aliasing_model={}";
+		reply += " aliasingModel={}";
 	}
 	if spec.warn {
 		reply += " warn={}";
@@ -100,7 +105,7 @@ pub fn generic_help(spec: GenericHelp<'_>) -> String {
 		reply += "- channel: stable, beta, nightly (default: nightly)\n";
 	}
 	if spec.aliasing_model {
-		reply += "- aliasing_model: stacked, tree (default: stacked)\n";
+		reply += "- aliasingModel: stacked, tree (default: stacked)\n";
 	}
 	reply += "- edition: 2015, 2018, 2021, 2024 (default: 2024)\n";
 	if spec.warn {
