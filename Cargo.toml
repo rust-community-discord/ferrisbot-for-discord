@@ -41,3 +41,5 @@ itertools = "0.14"
 futures = "0.3.31"
 proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 implicit-fn = "0.1.0"
+regex = "1.11.1"
+regex-syntax = "0.8.5"
