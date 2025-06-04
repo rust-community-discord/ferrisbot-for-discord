@@ -105,6 +105,11 @@ code here
 				commands::playground::fmt(),
 				commands::playground::microbench(),
 				commands::playground::procmacro(),
+				commands::highlight::highlight(),
+				commands::highlight::remove(),
+				commands::highlight::list(),
+				commands::highlight::add(),
+				commands::highlight::mat(),
 			],
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
@@ -241,6 +246,25 @@ async fn event_handler(
 	if let serenity::FullEvent::Ready { .. } = event {
 		let http = ctx.http.clone();
 		tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
+	}
+
+	if let serenity::FullEvent::Message { new_message } = event {
+		if !new_message.author.bot {
+			for (matcher, person) in
+				crate::commands::highlight::all_matches(&new_message.content, &data.database).await
+			{
+				_ = person
+					.direct_message(
+						ctx,
+						serenity::CreateMessage::new().content(format!(
+							"your match `{matcher}` was satisfied on message ```\n{}\n``` {}",
+							new_message.content.replace('`', "​`"),
+							new_message.link()
+						)),
+					)
+					.await;
+			}
+		}
 	}
 
 	if let serenity::FullEvent::InteractionCreate {
