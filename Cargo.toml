@@ -12,9 +12,9 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-shuttle-runtime = "0.53.0"
-shuttle-serenity = "0.53.0"
-shuttle-shared-db = { version = "0.53.0", features = ["postgres", "sqlx"] }
+shuttle-runtime = "0.56.0"
+shuttle-serenity = "0.56.0"
+shuttle-shared-db = { version = "0.56.0", features = ["postgres", "sqlx"] }
 poise = "0.6"
 anyhow = "1.0"
 tokio = "1.44"
