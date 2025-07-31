@@ -95,6 +95,7 @@ code here
 				commands::modmail::modmail(),
 				commands::modmail::modmail_context_menu_for_message(),
 				commands::modmail::modmail_context_menu_for_user(),
+				commands::moving::move_messages_context_menu(),
 				commands::playground::play(),
 				commands::playground::playwarn(),
 				commands::playground::eval(),
