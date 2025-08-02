@@ -1,13 +1,19 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+	collections::{HashMap, HashSet},
+	ops::Not as _,
+};
 
 use anyhow::{anyhow, Result};
 use futures::StreamExt as _;
 use itertools::Itertools;
-use poise::{serenity_prelude::*, ChoiceParameter, CreateReply, ReplyHandle};
+use poise::{
+	modal::execute_modal_on_component_interaction, serenity_prelude::*, ChoiceParameter,
+	CreateReply, ReplyHandle,
+};
 
 use crate::types::Context;
 
-#[derive(Copy, Clone, Default, poise::ChoiceParameter)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, poise::ChoiceParameter)]
 enum MoveDestinationOption {
 	#[default]
 	Channel,
@@ -42,6 +48,7 @@ impl MoveDestinationOption {
 enum MoveOptions {
 	NewThread {
 		channel_id: ChannelId,
+		thread_name: String,
 	},
 	ExistingThread {
 		channel_id: ChannelId,
@@ -52,6 +59,7 @@ enum MoveOptions {
 	},
 	NewForumPost {
 		forum_id: ChannelId,
+		post_name: String,
 	},
 }
 
@@ -100,11 +108,17 @@ enum MoveOptionComponent {
 		NewForumPostComponent
 	)]
 	ExecuteButton,
+	#[subenum(NewThreadComponent, NewForumPostComponent)]
+	ChangeNameButton,
 }
 
 impl MoveOptionComponent {
 	const fn needs_to_be_set(self) -> bool {
 		matches!(self, Self::Forum | Self::Thread | Self::Channel)
+	}
+
+	fn can_defer(self) -> bool {
+		matches!(self, Self::ChangeNameButton).not()
 	}
 }
 
@@ -190,7 +204,10 @@ impl MoveOptions {
 				delete_on_fail: false,
 			}),
 
-			Self::NewThread { channel_id } => {
+			Self::NewThread {
+				channel_id,
+				thread_name,
+			} => {
 				let create_from_first_message = *channel_id == ctx.channel_id();
 
 				let thread = if create_from_first_message {
@@ -198,7 +215,7 @@ impl MoveOptions {
 						.create_thread_from_message(
 							&ctx,
 							start_msg.id,
-							CreateThread::new("Moved conversation")
+							CreateThread::new(thread_name)
 								.kind(ChannelType::PublicThread)
 								.audit_log_reason("moved conversation"),
 						)
@@ -207,7 +224,7 @@ impl MoveOptions {
 					channel_id
 						.create_thread(
 							&ctx,
-							CreateThread::new("Moved conversation")
+							CreateThread::new(thread_name)
 								.kind(ChannelType::PublicThread)
 								.audit_log_reason("moved conversation"),
 						)
@@ -222,12 +239,15 @@ impl MoveOptions {
 				})
 			}
 
-			Self::NewForumPost { forum_id } => {
+			Self::NewForumPost {
+				forum_id,
+				post_name,
+			} => {
 				let post = forum_id
 					.create_forum_post(
 						&ctx,
 						CreateForumPost::new(
-							"Moved conversation",
+							post_name,
 							CreateMessage::new()
 								.add_embeds(start_msg.embeds.into_iter().map(Into::into).collect())
 								.add_files({
@@ -285,6 +305,7 @@ struct MoveOptionsDialog {
 	destination: MoveDestinationOption,
 
 	users: Vec<UserId>,
+	thread_name: String,
 	selected_users: Vec<UserId>,
 	selected_forum: Option<ChannelId>,
 	selected_thread: Option<ChannelId>,
@@ -311,6 +332,7 @@ impl MoveOptionsDialog {
 
 		let mut dialog = Self {
 			initial_msg,
+			thread_name: String::from("Moved conversation"),
 			destination: MoveDestinationOption::default(),
 			selected_users: users.clone(),
 			users,
@@ -356,6 +378,10 @@ impl MoveOptionsDialog {
 			}
 		};
 
+		if component.can_defer() {
+			interaction.defer(&ctx).await?;
+		}
+
 		match component {
 			MoveOptionComponent::SelectUsers => {
 				if let ComponentInteractionDataKind::UserSelect { values } = interaction.data.kind {
@@ -392,6 +418,21 @@ impl MoveOptionsDialog {
 				self.selected_channel = get_selected_channel(&interaction);
 			}
 
+			MoveOptionComponent::ChangeNameButton => {
+				let thread_name_input = execute_modal_on_component_interaction(
+					ctx,
+					interaction,
+					Some(ThreadNameModal {
+						thread_name: self.thread_name.clone(),
+					}),
+					None,
+				)
+				.await?;
+
+				if let Some(input) = thread_name_input {
+					self.thread_name = input.thread_name;
+				}
+			}
 			MoveOptionComponent::ExecuteButton => return self.build_move_options(ctx).await,
 		}
 
@@ -405,12 +446,21 @@ impl MoveOptionsDialog {
 	) -> impl Iterator<Item = CreateActionRow> + use<'_> {
 		self.destination = destination;
 		self.needs_to_be_set = destination.needs_to_be_set();
+		self.selected_thread = None;
 		self.update_set_fields();
 
 		destination
 			.components()
 			.into_iter()
 			.map(|c| self.create_component(c))
+			// Combine adjacent button components.
+			.coalesce(|a, b| match (a, b) {
+				(CreateActionRow::Buttons(mut a), CreateActionRow::Buttons(mut b)) => {
+					a.append(&mut b);
+					Ok(CreateActionRow::Buttons(a))
+				}
+				other => Err(other),
+			})
 	}
 
 	async fn build_move_options(&self, ctx: Context<'_>) -> Result<Option<MoveOptions>> {
@@ -428,6 +478,7 @@ impl MoveOptionsDialog {
 				channel_id: self
 					.selected_channel
 					.ok_or_else(|| anyhow!("No channel specified"))?,
+				thread_name: self.thread_name.clone(),
 			},
 			MoveDestinationOption::ExistingThread => {
 				let thread_id = self
@@ -452,6 +503,7 @@ impl MoveOptionsDialog {
 				forum_id: self
 					.selected_forum
 					.ok_or_else(|| anyhow!("No forum specified"))?,
+				post_name: self.thread_name.clone(),
 			},
 		};
 
@@ -542,6 +594,16 @@ impl MoveOptionsDialog {
 					.style(ButtonStyle::Danger)
 					.label("Move")])
 			}
+			MoveOptionComponent::ChangeNameButton => {
+				let label = if self.destination == MoveDestinationOption::NewForumPost {
+					"Change forum post name"
+				} else {
+					"Change thread name"
+				};
+				CreateActionRow::Buttons(vec![CreateButton::new(custom_id)
+					.style(ButtonStyle::Secondary)
+					.label(label)])
+			}
 		}
 	}
 }
@@ -580,8 +642,6 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		let Some(component_interaction) = interaction_stream.next().await else {
 			break None;
 		};
-
-		component_interaction.defer(&ctx).await?;
 
 		if let Some(move_options) = options
 			.dialog
