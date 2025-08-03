@@ -39,4 +39,5 @@ rand = "0.9"
 syn = { version = "2.0.100", features = ["full"] }
 itertools = "0.14"
 futures = "0.3.31"
+proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 implicit-fn = "0.1.0"

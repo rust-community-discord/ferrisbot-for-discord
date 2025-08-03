@@ -653,6 +653,7 @@ dependencies = [
  "implicit-fn",
  "itertools 0.14.0",
  "poise",
+ "proc-macro2",
  "rand 0.9.0",
  "reqwest 0.12.15",
  "serde",
