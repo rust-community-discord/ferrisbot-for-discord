@@ -91,6 +91,7 @@ code here
 				commands::utilities::cleanup(),
 				commands::utilities::ban(),
 				commands::utilities::selftimeout(),
+				commands::utilities::solved(),
 				commands::thread_pin::thread_pin(),
 				commands::modmail::modmail(),
 				commands::modmail::modmail_context_menu_for_message(),
