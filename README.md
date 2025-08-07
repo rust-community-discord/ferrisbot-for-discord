@@ -1,4 +1,7 @@
-# Rustbot
+<p align="center">
+    <img src="assets/server-icons/bases/server_icon_base.png" />
+</p>
+<h1 color="#000000" size="100px" align="center"> Rust Bot </h1>
 
 ## Inviting the bot
 
@@ -10,10 +13,13 @@ Some permissions are required:
 Furthermore, the `applications.commands` OAuth2 scope is required for slash commands.
 
 Here's an invite link to an instance hosted by @kangalioo on my Raspberry Pi, with the permissions and scopes incorporated:
-https://discord.com/oauth2/authorize?client_id=804340127433752646&permissions=268445760&scope=bot%20applications.commands
+
+[invite the bot](https://discord.com/oauth2/authorize?client_id=804340127433752646&permissions=268445760&scope=bot%20applications.commands)
 
 Adjust the `client_id` in the URL for your own hosted instances of the bot.
 
+
+>[NOTE]
 ## Hosting the bot
 
 The bot requires `Server Members Intent` enabled in the `Applications > $YOUR_BOTS_NAME > Bot`
