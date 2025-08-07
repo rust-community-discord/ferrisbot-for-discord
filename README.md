@@ -19,7 +19,6 @@ Here's an invite link to an instance hosted by @kangalioo on my Raspberry Pi, wi
 Adjust the `client_id` in the URL for your own hosted instances of the bot.
 
 
->[NOTE]
 ## Hosting the bot
 
 The bot requires `Server Members Intent` enabled in the `Applications > $YOUR_BOTS_NAME > Bot`
