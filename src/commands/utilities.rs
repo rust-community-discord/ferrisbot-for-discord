@@ -223,6 +223,7 @@ pub async fn ban(
 /// Self-timeout yourself.
 /// You can specify how long you want to timeout yourself for, either in hours
 /// or in minutes.
+#[expect(clippy::doc_markdown, reason = "not markdown, shown to end user")]
 #[poise::command(
 	slash_command,
 	category = "Utilities",
