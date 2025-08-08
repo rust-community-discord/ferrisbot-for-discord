@@ -321,6 +321,10 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 /// Optional arguments:
 /// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
+#[expect(
+	clippy::doc_link_with_quotes,
+	reason = "not markdown, shown to end user"
+)]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 #[implicit_fn::implicit_fn]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
@@ -370,6 +374,10 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 /// Optional arguments:
 /// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
+#[expect(
+	clippy::doc_link_with_quotes,
+	reason = "not markdown, shown to end user"
+)]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
@@ -404,6 +412,10 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 /// Optional arguments:
 /// - `flags*`: flags to pass to rustc invocation. Defaults to ["-Copt-level=3", "--edition=2024"]
 /// - `rustc`: compiler version to invoke. Defaults to `nightly`. Possible values: `nightly`, `beta` or full version like `1.45.2`
+#[expect(
+	clippy::doc_link_with_quotes,
+	reason = "not markdown, shown to end user"
+)]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
 pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
