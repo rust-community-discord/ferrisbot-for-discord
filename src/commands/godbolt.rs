@@ -1,6 +1,6 @@
 use std::{collections::HashMap, mem::take};
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use poise::{CodeBlockError, KeyValueArgs};
 use syn::spanned::Spanned;
 use tracing::warn;

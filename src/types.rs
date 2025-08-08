@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result, anyhow};
 use poise::serenity_prelude as serenity;
 use shuttle_runtime::SecretStore;
 

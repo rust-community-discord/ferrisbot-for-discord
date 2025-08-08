@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Error};
+use anyhow::{Error, anyhow, bail};
 use reqwest::header;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::info;

@@ -1,6 +1,6 @@
 use std::iter::once;
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
 use tracing::{error, info};
 
@@ -145,7 +145,8 @@ pub(crate) async fn rustc_id_and_flags(
 		.cloned()
 		.ok_or(anyhow!(
 			"the `rustc` argument should be a version specifier like `nightly` `beta` or `1.45.2`. \
-            Run ?targets for a full list"))?;
+            Run ?targets for a full list"
+		))?;
 
 	let opt_level = params.get("-Copt-level").unwrap_or("3");
 	let edition = params.get("--edition").unwrap_or("2024");

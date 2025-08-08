@@ -1,7 +1,7 @@
 use anyhow::Result;
 use anyhow::{anyhow, bail};
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use reqwest::header;
 use serde::Deserialize;
 use tracing::info;
