@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::Timestamp;
 use rand::Rng;
