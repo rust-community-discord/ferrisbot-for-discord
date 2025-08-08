@@ -1,13 +1,14 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Error, Result};
 use poise::serenity_prelude as serenity;
 use shuttle_runtime::SecretStore;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::commands;
 
 #[derive(Debug)]
 pub struct Data {
+	pub highlights: RwLock<commands::highlight::RegexHolder>,
 	pub database: sqlx::PgPool,
 	pub discord_guild_id: serenity::GuildId,
 	pub application_id: serenity::UserId,
@@ -21,8 +22,9 @@ pub struct Data {
 }
 
 impl Data {
-	pub fn new(secret_store: &SecretStore, database: sqlx::PgPool) -> Result<Self> {
+	pub async fn new(secret_store: &SecretStore, database: sqlx::PgPool) -> Result<Self> {
 		Ok(Self {
+			highlights: RwLock::new(commands::highlight::RegexHolder::new(&database).await),
 			database,
 			discord_guild_id: secret_store
 				.get("DISCORD_GUILD")
