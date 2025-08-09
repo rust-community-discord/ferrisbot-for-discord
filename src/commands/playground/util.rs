@@ -304,7 +304,7 @@ pub async fn send_reply(
 	let timeout =
 		result.contains("Killed") && result.contains("timeout") && result.contains("--signal=KILL");
 
-	let mut text_end = String::from("```");
+	let mut text_end = String::from("\n```");
 	if timeout {
 		text_end += "Playground timeout detected";
 	}
