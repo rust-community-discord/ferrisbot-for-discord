@@ -1,4 +1,5 @@
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
@@ -259,6 +260,74 @@ pub async fn selftimeout(
 		ctx.author().name,
 		then.unix_timestamp()
 	))
+	.await?;
+
+	Ok(())
+}
+
+/// Edit a message by its ID
+///
+/// /edit <message_id>
+///
+/// Replaces the content of the specified message with your next message.
+/// Only moderators can use this command.
+#[poise::command(
+	slash_command,
+	category = "Utilities",
+	check = "crate::checks::check_is_moderator",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+pub async fn edit(
+	ctx: Context<'_>,
+	#[description = "Link to the message to edit"] mut message: serenity::Message,
+) -> Result<(), Error> {
+	ctx.send(
+		poise::CreateReply::default()
+			.content("✅ Please send the new content for the message. I'll wait for 60 seconds.")
+			.ephemeral(true),
+	)
+	.await?;
+
+	// Wait for the next message from the same user in the same channel
+	let author_id = ctx.author().id;
+	let channel_id = ctx.channel_id();
+
+	let new_content = {
+		let collector = serenity::MessageCollector::new(ctx.serenity_context())
+			.author_id(author_id)
+			.channel_id(channel_id)
+			.timeout(Duration::from_secs(60));
+
+		match collector.next().await {
+			Some(msg) if !msg.content.is_empty() => msg.content,
+			Some(_) => {
+				ctx.send(
+					poise::CreateReply::default()
+						.content("❌ Empty message received. Edit cancelled.")
+						.ephemeral(true),
+				)
+				.await?;
+				return Ok(());
+			}
+			None => {
+				ctx.send(
+					poise::CreateReply::default()
+						.content("⏰ Timeout: No message received within 60 seconds. Edit cancelled.")
+						.ephemeral(true),
+				)
+				.await?;
+				return Ok(());
+			}
+		}
+	};
+
+	message.edit(&ctx, serenity::EditMessage::new().content(&new_content)).await?;
+
+	ctx.send(
+		poise::CreateReply::default()
+			.content("✅ Message edited successfully!")
+			.ephemeral(true),
+	)
 	.await?;
 
 	Ok(())

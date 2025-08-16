@@ -91,6 +91,7 @@ code here
 				commands::utilities::cleanup(),
 				commands::utilities::ban(),
 				commands::utilities::selftimeout(),
+				commands::utilities::edit(),
 				commands::thread_pin::thread_pin(),
 				commands::modmail::modmail(),
 				commands::modmail::modmail_context_menu_for_message(),
@@ -196,8 +197,8 @@ code here
 		.build();
 
 	// Don't include presence updates, as they consume a lot of memory and CPU.
-	let intents = serenity::GatewayIntents::non_privileged() 
-		| serenity::GatewayIntents::GUILD_MEMBERS 
+	let intents = serenity::GatewayIntents::non_privileged()
+		| serenity::GatewayIntents::GUILD_MEMBERS
 		| serenity::GatewayIntents::MESSAGE_CONTENT;
 
 	let client = serenity::ClientBuilder::new(token, intents)
