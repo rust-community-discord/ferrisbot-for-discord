@@ -22,3 +22,4 @@ jobs:
             MOD_ROLE_ID = '${{ vars.MOD_ROLE_ID }}'
             RUSTACEAN_ROLE_ID = '${{ vars.RUSTACEAN_ROLE_ID }}'
             MODMAIL_CHANNEL_ID = '${{ vars.MODMAIL_CHANNEL_ID }}'
+            MODLOG_CHANNEL_ID = '${{ vars.MODLOG_CHANNEL_ID }}'
