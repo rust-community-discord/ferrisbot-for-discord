@@ -14,6 +14,7 @@ pub struct Data {
 	pub mod_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
 	pub modmail_channel_id: serenity::ChannelId,
+	pub modlog_channel_id: serenity::ChannelId,
 	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
@@ -54,6 +55,13 @@ impl Data {
 				.get("MODMAIL_CHANNEL_ID")
 				.ok_or(anyhow!(
 					"Failed to get 'MODMAIL_CHANNEL_ID' from the secret store"
+				))?
+				.parse::<u64>()?
+				.into(),
+			modlog_channel_id: secret_store
+				.get("MODLOG_CHANNEL_ID")
+				.ok_or(anyhow!(
+					"Failed to get 'MODLOG_CHANNEL_ID' from the secret store"
 				))?
 				.parse::<u64>()?
 				.into(),

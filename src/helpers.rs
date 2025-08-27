@@ -1,5 +1,5 @@
-use anyhow::Error;
-use poise::serenity_prelude as serenity;
+use anyhow::{Error, bail, Context as AnyhowContext};
+use poise::serenity_prelude::{self as serenity, Mentionable};
 use tracing::warn;
 
 use crate::types::{Context, Data};
@@ -149,5 +149,42 @@ pub async fn reply_potentially_long_text(
 ) -> Result<(), Error> {
 	ctx.say(trim_text(text_body, text_end, truncation_msg_future).await)
 		.await?;
+	Ok(())
+}
+
+/// Send an audit log message to the modlog channel
+pub async fn send_audit_log(
+	ctx: Context<'_>,
+	category: &str,
+	executor: serenity::UserId,
+	content: &str,
+) -> Result<(), Error> {
+	let modlog_channel_id = ctx.data().modlog_channel_id;
+
+	let channel = modlog_channel_id
+		.to_channel(&ctx)
+		.await
+		.context("Modlog channel not found. Please create a channel and set the MODLOG_CHANNEL_ID environment variable to its ID.")?;
+
+	let is_text_channel = matches!(channel.guild(), Some(guild_channel) if guild_channel.kind == serenity::ChannelType::Text);
+
+	if !is_text_channel {
+		bail!("Modlog channel must be a text channel. Please set MODLOG_CHANNEL_ID to a valid text channel ID.");
+	}
+
+	let mentionable_username = executor.mention();
+
+	let log_message = format!(
+		"Log Category: {}\nExecutor: {}\n\n{}",
+		category,
+		mentionable_username,
+		content
+	);
+
+	modlog_channel_id
+		.say(&ctx, log_message)
+		.await
+		.context("Failed to send audit log message")?;
+
 	Ok(())
 }
