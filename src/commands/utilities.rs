@@ -313,7 +313,9 @@ pub async fn edit(
 			None => {
 				ctx.send(
 					poise::CreateReply::default()
-						.content("⏰ Timeout: No message received within 60 seconds. Edit cancelled.")
+						.content(
+							"⏰ Timeout: No message received within 60 seconds. Edit cancelled.",
+						)
 						.ephemeral(true),
 				)
 				.await?;
@@ -323,12 +325,9 @@ pub async fn edit(
 	};
 
 	// Log the old message content before editing
-	if let Err(e) = crate::helpers::send_audit_log(
-		ctx,
-		"Edit Command",
-		ctx.author().id,
-		&message.content,
-	).await {
+	if let Err(e) =
+		crate::helpers::send_audit_log(ctx, "Edit Command", ctx.author().id, &message.content).await
+	{
 		ctx.send(
 			poise::CreateReply::default()
 				.content(format!("❌ Failed to log audit information: {e}"))
@@ -338,7 +337,9 @@ pub async fn edit(
 		return Ok(());
 	}
 
-	message.edit(&ctx, serenity::EditMessage::new().content(&new_content)).await?;
+	message
+		.edit(&ctx, serenity::EditMessage::new().content(&new_content))
+		.await?;
 
 	ctx.send(
 		poise::CreateReply::default()
