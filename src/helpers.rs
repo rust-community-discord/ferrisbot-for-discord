@@ -175,10 +175,7 @@ pub async fn send_audit_log(
 	let mentionable_username = executor.mention();
 
 	let log_message = format!(
-		"Log Category: {}\nExecutor: {}\n\n{}",
-		category,
-		mentionable_username,
-		content
+		"Log Category: {category}\nExecutor: {mentionable_username}\n\n{content}"
 	);
 
 	modlog_channel_id

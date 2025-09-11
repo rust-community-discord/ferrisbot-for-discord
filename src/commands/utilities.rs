@@ -265,6 +265,7 @@ pub async fn selftimeout(
 	Ok(())
 }
 
+#[expect(clippy::doc_markdown)]
 /// Edit a message by its ID
 ///
 /// /edit <message_id>
@@ -330,7 +331,7 @@ pub async fn edit(
 	).await {
 		ctx.send(
 			poise::CreateReply::default()
-				.content(&format!("❌ Failed to log audit information: {}", e))
+				.content(format!("❌ Failed to log audit information: {e}"))
 				.ephemeral(true),
 		)
 		.await?;
