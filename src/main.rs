@@ -54,7 +54,7 @@ code here
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, pool)?;
+				let data = Data::new(&secret_store, pool).await?;
 
 				debug!("Registering commands...");
 				poise::builtins::register_in_guild(
@@ -250,9 +250,7 @@ async fn event_handler(
 
 	if let serenity::FullEvent::Message { new_message } = event {
 		if !new_message.author.bot {
-			for (matcher, person) in
-				crate::commands::highlight::all_matches(&new_message.content, &data.database).await
-			{
+			for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
 				_ = person
 					.direct_message(
 						ctx,

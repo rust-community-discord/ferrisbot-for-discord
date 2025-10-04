@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::types::Context;
 use anyhow::{Error, Result};
 use implicit_fn::implicit_fn;
@@ -5,7 +7,7 @@ use poise::{
 	CreateReply,
 	serenity_prelude::{CreateEmbed, UserId},
 };
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Postgres};
 
 #[poise::command(
@@ -21,7 +23,7 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 #[poise::command(prefix_command, slash_command)]
 /// Adds a highlight. When a highlight is matched, you will receive a DM.
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
-	if let Err(e) = regex_syntax::parse(&regex) {
+	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
 		c.say(format!("```\n{e}```")).await?;
 		return Ok(());
 	};
@@ -37,6 +39,7 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	.execute(&c.data().database)
 	.await?;
 	c.say("hl added!").await?;
+	RegexHolder::update(c.data()).await;
 	Ok(())
 }
 
@@ -77,6 +80,7 @@ pub async fn remove(c: Context<'_>, regex: String) -> Result<()> {
 		},
 	)
 	.await?;
+	RegexHolder::update(c.data()).await;
 	Ok(())
 }
 
@@ -121,28 +125,6 @@ pub async fn matches<'a, 'b: 'a>(
 		.filter(|x| Regex::new(&x).unwrap().is_match(haystack))
 }
 
-#[implicit_fn]
-pub async fn all_matches<'a>(
-	haystack: &'a str,
-	db: &Pool<Postgres>,
-) -> impl Iterator<Item = (String, UserId)> + 'a {
-	// could use sql regex matching if problematic
-	// or maybe we have to use words like turtle
-	sqlx::query!["select * from highlights"]
-		.fetch_all(db)
-		.await
-		.ok()
-		.into_iter()
-		.flatten()
-		.flat_map(|x| {
-			x.highlight
-				.into_iter()
-				.filter(|x| Regex::new(&x).unwrap().is_match(haystack))
-				.take(1)
-				.map(move |y| (y, UserId::new(x.id as _)))
-		})
-}
-
 #[poise::command(prefix_command, slash_command, rename = "match")]
 #[implicit_fn::implicit_fn]
 /// Tests if your highlights match a given string
@@ -161,4 +143,39 @@ pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
 	.await?;
 
 	Ok(())
+}
+#[derive(Debug)]
+pub struct RegexHolder(Vec<(UserId, Regex)>);
+impl RegexHolder {
+	pub async fn new(db: &Pool<Postgres>) -> Self {
+		Self(
+			sqlx::query!["select * from highlights"]
+				.fetch_all(db)
+				.await
+				.ok()
+				.into_iter()
+				.flatten()
+				.flat_map(|x| {
+					x.highlight
+						.into_iter()
+						.map(move |y| (UserId::new(x.id.cast_unsigned()), Regex::new(&y).unwrap()))
+				})
+				.collect(),
+		)
+	}
+
+	async fn update(data: &crate::types::Data) {
+		let new = Self::new(&data.database).await;
+		*data.highlights.write().await = new;
+	}
+
+	#[implicit_fn]
+	pub fn find(&self, haystack: &str) -> impl Iterator<Item = (UserId, &str)> {
+		self.0
+			.iter()
+			.filter(_.1.is_match(haystack))
+			.map(|(x, y)| (*x, y.as_str()))
+			.collect::<HashMap<_, _>>()
+			.into_iter()
+	}
 }
