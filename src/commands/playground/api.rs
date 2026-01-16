@@ -90,7 +90,7 @@ impl FromStr for Channel {
 			"stable" => Ok(Channel::Stable),
 			"beta" => Ok(Channel::Beta),
 			"nightly" => Ok(Channel::Nightly),
-			_ => bail!("invalid release channel `{}`", s),
+			_ => bail!("invalid release channel `{s}`"),
 		}
 	}
 }
@@ -116,7 +116,7 @@ impl FromStr for Edition {
 			"2018" => Ok(Edition::E2018),
 			"2021" => Ok(Edition::E2021),
 			"2024" => Ok(Edition::E2024),
-			_ => bail!("invalid edition `{}`", s),
+			_ => bail!("invalid edition `{s}`"),
 		}
 	}
 }
@@ -144,7 +144,7 @@ impl FromStr for Mode {
 		match s {
 			"debug" => Ok(Mode::Debug),
 			"release" => Ok(Mode::Release),
-			_ => bail!("invalid compilation mode `{}`", s),
+			_ => bail!("invalid compilation mode `{s}`"),
 		}
 	}
 }
@@ -163,7 +163,7 @@ impl FromStr for AliasingModel {
 		Ok(match s {
 			"stacked" => AliasingModel::Stacked,
 			"tree" => AliasingModel::Tree,
-			_ => bail!("invalid aliasing model `{}`", s),
+			_ => bail!("invalid aliasing model `{s}`"),
 		})
 	}
 }
