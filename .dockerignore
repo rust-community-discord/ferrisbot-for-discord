@@ -6,4 +6,3 @@
 !/migrations
 !sqlx-data.json
 !/assets
-!shuttle_prebuild.sh

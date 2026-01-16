@@ -10,12 +10,9 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-shuttle-runtime = "0.56.0"
-shuttle-serenity = "0.56.0"
-shuttle-shared-db = { version = "0.56.0", features = ["postgres", "sqlx"] }
-poise = "0.6"
 ab_glyph = { version = "0.2", default-features = false }
 anyhow = "1.0"
+figment = { version = "0.10.19", features = ["env", "toml"] }
 futures = "0.3.31"
 image = { version = "0.25", default-features = false, features = ["png"] }
 imageproc = { version = "0.25", default-features = false }
@@ -32,9 +29,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-shuttle-runtime = "0.56.0"
-shuttle-serenity = "0.56.0"
-shuttle-shared-db = { version = "0.56.0", features = ["postgres", "sqlx"] }
+snafu = "0.8.9"
 sqlx = { version = "0.8.6", features = [
   "macros",
   "postgres",
@@ -46,10 +41,9 @@ syn = { version = "2.0.104", default-features = false, features = [
   "parsing",
   "printing",
 ] }
-tokio = "1.47"
+tokio = { version = "1.47", features = ["rt-multi-thread"] }
 tracing = "0.1.41"
-implicit-fn = "0.1.0"
-subenum = "1.1.2"
-strum = "0.27.2"
-regex = { version = "1.11.1", default-features = false, features = ["perf"] }
-regex-syntax = "0.8.5"
+tracing-appender = "0.2.4"
+tracing-log = "0.2.0"
+tracing-panic = "0.1.2"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }

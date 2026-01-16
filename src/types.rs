@@ -2,10 +2,8 @@ use std::sync::Arc;
 
 use anyhow::{Error, Result, anyhow};
 use poise::serenity_prelude as serenity;
-use shuttle_runtime::SecretStore;
-use tokio::sync::RwLock;
 
-use crate::commands;
+use crate::{SecretStore, commands};
 
 #[derive(Debug)]
 pub struct Data {

@@ -8,6 +8,7 @@
 	clippy::assigning_clones, // Too many false triggers
 )]
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +16,6 @@ use std::time::Duration;
 use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
 use rand::{Rng, seq::IteratorRandom};
-use shuttle_runtime::SecretStore;
-use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
 
 use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
@@ -27,11 +26,27 @@ pub mod commands;
 pub mod helpers;
 pub mod types;
 
-#[shuttle_runtime::main]
-async fn serenity(
-	#[shuttle_runtime::Secrets] secret_store: SecretStore,
-	#[shuttle_shared_db::Postgres] pool: sqlx::PgPool,
-) -> ShuttleSerenity {
+pub struct SecretStore(pub HashMap<String, String>);
+
+impl SecretStore {
+	#[must_use]
+	pub fn get(&self, key: &str) -> Option<String> {
+		self.0.get(key).cloned()
+	}
+}
+
+pub struct ShuttleSerenity(pub serenity::Client);
+
+impl From<serenity::Client> for ShuttleSerenity {
+	fn from(value: serenity::Client) -> Self {
+		Self(value)
+	}
+}
+
+pub async fn serenity(
+	secret_store: SecretStore,
+	pool: sqlx::PgPool,
+) -> Result<ShuttleSerenity, Error> {
 	const FAILED_CODEBLOCK: &str = "\
 Missing code block. Please use the following markdown:
 `` `code here` ``
