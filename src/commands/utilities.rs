@@ -309,7 +309,7 @@ pub async fn solved(ctx: Context<'_>) -> Result<(), Error> {
 		ctx,
 		EditThread::new().applied_tags(tags_new)
 	).await?;
-	
+
 	Ok(())
 }
 /// Edit a message by its ID

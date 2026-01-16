@@ -45,13 +45,13 @@ async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate> {
 		.await?
 		.json::<Crates>()
 		.await
-		.map_err(|e| anyhow!("Cannot parse crates.io JSON response (`{}`)", e))?;
+		.map_err(|e| anyhow!("Cannot parse crates.io JSON response (`{e}`)"))?;
 
 	let crate_ = crate_list
 		.crates
 		.into_iter()
 		.next()
-		.ok_or_else(|| anyhow!("Crate `{}` not found", query))?;
+		.ok_or_else(|| anyhow!("Crate `{query}` not found"))?;
 
 	if crate_.exact_match {
 		Ok(crate_)

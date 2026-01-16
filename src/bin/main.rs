@@ -257,6 +257,7 @@ enum AppError {
 	SerenityInit { source: anyhow::Error },
 	#[snafu(display("serenity client failed"))]
 	Serentity {
-		source: poise::serenity_prelude::Error,
+		#[snafu(source(from(poise::serenity_prelude::Error, Box::new)))]
+		source: Box<poise::serenity_prelude::Error>,
 	},
 }
