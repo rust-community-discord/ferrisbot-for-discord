@@ -2,42 +2,45 @@
 name = "ferrisbot-for-discord"
 version = "0.1.0"
 authors = [
-    "kangalioo",
-    "technetos <mrgould93@gmail.com>",
-    "Ivan Dardi <ivanbdardi@gmail.com>",
+  "kangalioo",
+  "technetos <mrgould93@gmail.com>",
+  "Ivan Dardi <ivanbdardi@gmail.com>",
 ]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-shuttle-runtime = "0.53.0"
-shuttle-serenity = "0.53.0"
-shuttle-shared-db = { version = "0.53.0", features = ["postgres", "sqlx"] }
-poise = "0.6"
+ab_glyph = { version = "0.2", default-features = false }
 anyhow = "1.0"
-tokio = "1.44"
-tracing = "0.1.41"
+futures = "0.3.31"
+image = { version = "0.25", default-features = false, features = ["png"] }
+imageproc = { version = "0.25", default-features = false }
+itertools = "0.14"
+poise = { version = "0.6", default-features = false, features = [
+  "default",
+  "handle_panics",
+] }
+proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
+rand = "0.9"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sqlx = { version = "0.8.3", features = [
-    "runtime-tokio-native-tls",
-    "postgres",
-    "macros",
+shuttle-runtime = "0.56.0"
+shuttle-serenity = "0.56.0"
+shuttle-shared-db = { version = "0.56.0", features = ["postgres", "sqlx"] }
+sqlx = { version = "0.8.6", features = [
+  "macros",
+  "postgres",
+  "runtime-tokio",
+  "tls-rustls",
 ] }
-reqwest = { version = "0.12", default-features = false, features = [
-    "json",
-    "rustls-tls",
+syn = { version = "2.0.104", default-features = false, features = [
+  "full",
+  "parsing",
+  "printing",
 ] }
-image = { version = "0.25", default-features = false, features = [
-    "png",
-] } # get a better computer meme rendering
-imageproc = { version = "0.25", default-features = false } # get a better computer meme rendering
-ab_glyph = { version = "0.2", default-features = false } # interact with imageproc
-rand = "0.9"
-syn = { version = "2.0.100", features = ["full"] }
-itertools = "0.14"
-futures = "0.3.31"
-proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
-implicit-fn = "0.1.0"
+tokio = "1.47"
+tracing = "0.1.41"

@@ -1,14 +1,14 @@
 use anyhow::Error;
 use core::fmt::Write as _;
-use syn::{parse_file, Item, ItemFn, Visibility};
+use syn::{Item, ItemFn, Visibility, parse_file};
 
 use crate::types::Context;
 
 use super::{
 	api::{CrateType, Mode, PlayResult, PlaygroundRequest},
 	util::{
-		format_play_eval_stderr, generic_help, hoise_crate_attributes, parse_flags, send_reply,
-		stub_message, GenericHelp,
+		GenericHelp, format_play_eval_stderr, generic_help, hoise_crate_attributes, parse_flags,
+		send_reply, stub_message,
 	},
 };
 
@@ -169,10 +169,10 @@ fn extract_pub_fn_names_from_user_code(code: &str) -> Vec<String> {
 	file.items
 		.iter()
 		.filter_map(|item| {
-			if let Item::Fn(ItemFn { vis, sig, .. }) = item {
-				if matches!(vis, Visibility::Public(_)) {
-					return Some(sig.ident.to_string());
-				}
+			if let Item::Fn(ItemFn { vis, sig, .. }) = item
+				&& matches!(vis, Visibility::Public(_))
+			{
+				return Some(sig.ident.to_string());
 			}
 			None
 		})
