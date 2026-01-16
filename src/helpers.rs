@@ -1,4 +1,4 @@
-use anyhow::{Error, bail, Context as AnyhowContext};
+use anyhow::{Context as AnyhowContext, Error, bail};
 use poise::serenity_prelude::{self as serenity, Mentionable};
 use tracing::warn;
 
@@ -169,17 +169,15 @@ pub async fn send_audit_log(
 	let is_text_channel = matches!(channel.guild(), Some(guild_channel) if guild_channel.kind == serenity::ChannelType::Text);
 
 	if !is_text_channel {
-		bail!("Modlog channel must be a text channel. Please set MODLOG_CHANNEL_ID to a valid text channel ID.");
+		bail!(
+			"Modlog channel must be a text channel. Please set MODLOG_CHANNEL_ID to a valid text channel ID."
+		);
 	}
 
 	let mentionable_username = executor.mention();
 
-	let log_message = format!(
-		"Log Category: {}\nExecutor: {}\n\n{}",
-		category,
-		mentionable_username,
-		content
-	);
+	let log_message =
+		format!("Log Category: {category}\nExecutor: {mentionable_username}\n\n{content}");
 
 	modlog_channel_id
 		.say(&ctx, log_message)
