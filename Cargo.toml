@@ -10,6 +10,10 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
+shuttle-runtime = "0.56.0"
+shuttle-serenity = "0.56.0"
+shuttle-shared-db = { version = "0.56.0", features = ["postgres", "sqlx"] }
+poise = "0.6"
 ab_glyph = { version = "0.2", default-features = false }
 anyhow = "1.0"
 futures = "0.3.31"
@@ -45,5 +49,7 @@ syn = { version = "2.0.104", default-features = false, features = [
 tokio = "1.47"
 tracing = "0.1.41"
 implicit-fn = "0.1.0"
+subenum = "1.1.2"
+strum = "0.27.2"
 regex = { version = "1.11.1", default-features = false, features = ["perf"] }
 regex-syntax = "0.8.5"
