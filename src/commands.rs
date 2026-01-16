@@ -3,6 +3,7 @@ pub use playground::*;
 
 pub mod crates;
 pub mod godbolt;
+pub mod highlight;
 pub mod man;
 pub mod modmail;
 pub mod moving;

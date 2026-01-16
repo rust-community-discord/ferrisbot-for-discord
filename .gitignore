@@ -24,3 +24,5 @@ Secrets.dev.toml
 /target
 .shuttle*
 Secrets*.toml
+
+rustc-ice*

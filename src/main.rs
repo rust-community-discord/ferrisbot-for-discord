@@ -12,9 +12,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
-use rand::{seq::IteratorRandom, Rng};
+use rand::{Rng, seq::IteratorRandom};
 use shuttle_runtime::SecretStore;
 use shuttle_serenity::ShuttleSerenity;
 use tracing::{debug, info, warn};
@@ -54,7 +54,7 @@ code here
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, pool)?;
+				let data = Data::new(&secret_store, pool).await?;
 
 				debug!("Registering commands...");
 				poise::builtins::register_in_guild(
@@ -91,6 +91,8 @@ code here
 				commands::utilities::cleanup(),
 				commands::utilities::ban(),
 				commands::utilities::selftimeout(),
+				commands::utilities::solved(),
+				commands::utilities::edit(),
 				commands::thread_pin::thread_pin(),
 				commands::modmail::modmail(),
 				commands::modmail::modmail_context_menu_for_message(),
@@ -105,6 +107,11 @@ code here
 				commands::playground::fmt(),
 				commands::playground::microbench(),
 				commands::playground::procmacro(),
+				commands::highlight::highlight(),
+				commands::highlight::remove(),
+				commands::highlight::list(),
+				commands::highlight::add(),
+				commands::highlight::mat(),
 			],
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
@@ -147,10 +154,10 @@ code here
 							warn!("{}", e);
 						}
 					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
-						if error.is::<poise::CodeBlockError>() {
-							if let Err(e) = ctx.say(FAILED_CODEBLOCK.to_owned()).await {
-								warn!("{}", e);
-							}
+						if error.is::<poise::CodeBlockError>()
+							&& let Err(e) = ctx.say(FAILED_CODEBLOCK.to_owned()).await
+						{
+							warn!("{}", e);
 						}
 						if let Err(e) = ctx.say(error.to_string()).await {
 							warn!("{}", e);
@@ -196,7 +203,10 @@ code here
 		})
 		.build();
 
-	let intents = serenity::GatewayIntents::all();
+	// Don't include presence updates, as they consume a lot of memory and CPU.
+	let intents = serenity::GatewayIntents::non_privileged()
+		| serenity::GatewayIntents::GUILD_MEMBERS
+		| serenity::GatewayIntents::MESSAGE_CONTENT;
 
 	let client = serenity::ClientBuilder::new(token, intents)
 		.framework(framework)
@@ -240,15 +250,31 @@ async fn event_handler(
 		tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
 	}
 
+	if let serenity::FullEvent::Message { new_message } = event {
+		if !new_message.author.bot {
+			for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
+				_ = person
+					.direct_message(
+						ctx,
+						serenity::CreateMessage::new().content(format!(
+							"your match `{matcher}` was satisfied on message ```\n{}\n``` {}",
+							new_message.content.replace('`', "​`"),
+							new_message.link()
+						)),
+					)
+					.await;
+			}
+		}
+	}
+
 	if let serenity::FullEvent::InteractionCreate {
 		interaction: serenity::Interaction::Component(component),
 		..
 	} = event
+		&& component.data.custom_id == "rplcs_create_new_modmail"
 	{
-		if component.data.custom_id == "rplcs_create_new_modmail" {
-			let message = "Created from modmail button";
-			create_modmail_thread(ctx, message, data, component.user.id).await?;
-		}
+		let message = "Created from modmail button";
+		create_modmail_thread(ctx, message, data, component.user.id).await?;
 	}
 
 	Ok(())

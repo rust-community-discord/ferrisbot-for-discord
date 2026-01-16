@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{EditThread, GuildChannel, Mentionable, UserId};
 use rand::Rng;
@@ -45,7 +45,10 @@ pub async fn modmail_context_menu_for_user(
 	ctx: Context<'_>,
 	#[description = "User to automatically link when opening a modmail"] user: serenity::User,
 ) -> Result<(), Error> {
-	let message = format!("User reported:\n{}\n{}\n\nPlease provide additional information about the user being reported.", user.id, user.name);
+	let message = format!(
+		"User reported:\n{}\n{}\n\nPlease provide additional information about the user being reported.",
+		user.id, user.name
+	);
 	let modmail = create_modmail_thread(ctx, message, ctx.data(), ctx.author().id).await?;
 	ctx.say(format!(
 		"Successfully sent your message to the moderators. Check out your modmail thread here: {}",

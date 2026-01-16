@@ -7,12 +7,13 @@ use crate::types::Context;
 
 use super::{
 	api::{
-		apply_online_rustfmt, ClippyRequest, CrateType, MacroExpansionRequest, MiriRequest,
-		PlayResult,
+		ClippyRequest, CrateType, MacroExpansionRequest, MiriRequest, PlayResult,
+		apply_online_rustfmt,
 	},
 	util::{
-		extract_relevant_lines, generic_help, maybe_wrap, maybe_wrapped, parse_flags, send_reply,
-		strip_fn_main_boilerplate_from_formatted, stub_message, GenericHelp, ResultHandling,
+		GenericHelp, ResultHandling, extract_relevant_lines, generic_help, maybe_wrap,
+		maybe_wrapped, parse_flags, send_reply, strip_fn_main_boilerplate_from_formatted,
+		stub_message,
 	},
 };
 
@@ -117,8 +118,19 @@ pub async fn expand(
 
 	if result.success {
 		match apply_online_rustfmt(ctx, &result.stdout, flags.edition).await {
-			Ok(PlayResult { success: true, stdout, .. }) => result.stdout = stdout,
-			Ok(PlayResult { success: false, stderr, .. }) => warn!("Huh, rustfmt failed even though this code successfully passed through macro expansion before: {}", stderr),
+			Ok(PlayResult {
+				success: true,
+				stdout,
+				..
+			}) => result.stdout = stdout,
+			Ok(PlayResult {
+				success: false,
+				stderr,
+				..
+			}) => warn!(
+				"Huh, rustfmt failed even though this code successfully passed through macro expansion before: {}",
+				stderr
+			),
 			Err(e) => warn!("Couldn't run rustfmt: {}", e),
 		}
 	}

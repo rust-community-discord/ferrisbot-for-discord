@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Error};
+use anyhow::{Error, anyhow, bail};
 use reqwest::header;
 use serde::{Deserialize, Deserializer, Serialize};
 use tracing::info;
@@ -61,49 +61,6 @@ pub struct FormatResponse {
 	pub success: bool,
 	pub code: String,
 	pub stderr: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CompileRequest<'a> {
-	pub assembly_flavor: AssemblyFlavour,
-	pub backtrace: bool,
-	pub channel: Channel,
-	pub code: &'a str,
-	pub crate_type: CrateType,
-	pub demangle_assembly: DemangleAssembly,
-	pub edition: Edition,
-	pub mode: Mode,
-	pub process_assembly: ProcessAssembly,
-	pub target: CompileTarget,
-	pub tests: bool,
-}
-
-#[derive(Debug, Default, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AssemblyFlavour {
-	#[default]
-	Intel,
-	#[allow(dead_code)]
-	Att,
-}
-
-#[derive(Debug, Default, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DemangleAssembly {
-	#[default]
-	Demangle,
-	#[allow(dead_code)]
-	Mangle,
-}
-
-#[derive(Debug, Default, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ProcessAssembly {
-	#[default]
-	Filter,
-	#[allow(dead_code)]
-	Raw,
 }
 
 #[derive(Debug, Serialize)]
