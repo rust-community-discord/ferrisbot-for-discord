@@ -175,6 +175,20 @@ pub struct PlayResult {
 	pub stderr: String,
 }
 
+impl PlayResult {
+	/// Inserts invisible whitespace in sequences of more than 2 backticks to prevent
+	/// escaping discord code blocks
+	pub fn sanitize_backticks(&mut self) {
+		if self.stdout.contains("```") {
+			self.stdout = self.stdout.replace("``", "``\u{200b}");
+		}
+
+		if self.stderr.contains("```") {
+			self.stderr = self.stderr.replace("``", "``\u{200b}");
+		}
+	}
+}
+
 impl<'de> Deserialize<'de> for PlayResult {
 	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
 		// The playground occasionally sends just a single "error" field, for example with

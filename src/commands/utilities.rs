@@ -1,4 +1,8 @@
 use std::sync::LazyLock;
+use std::iter;
+
+use anyhow::{anyhow, Error};
+use poise::serenity_prelude::{self as serenity, ChannelType, EditThread};
 use std::time::Duration;
 
 use anyhow::{Error, anyhow};
@@ -265,7 +269,49 @@ pub async fn selftimeout(
 	Ok(())
 }
 
-#[expect(clippy::doc_markdown)]
+/// Marks the current thread as solved
+#[poise::command(
+	prefix_command,
+	category = "Utilities",
+	discard_spare_arguments // to allow smooth integration in the closing message, e.g. "?solved, thank you"
+)]
+pub async fn solved(ctx: Context<'_>) -> Result<(), Error> {
+	let mut thread = ctx
+		.guild_channel()
+		.await
+		.filter(|channel| channel.kind == ChannelType::PublicThread)
+		.ok_or(anyhow!("not applicable here"))?;
+
+	let solved_tag = thread
+		.parent_id
+		.ok_or(anyhow!("thread lacks parent channel (¿dafuq?)"))? // to my knowledge threads can only ever exist within other channels
+		.to_channel(ctx)
+		.await?
+		.guild()
+		.ok_or(anyhow!("parent is not a guild channel (¿dafuq?)"))? // the thread itself is a guild channel, so its parent must be too
+		.available_tags
+		.into_iter()
+		.find(|tag| tag.name == "Solved")
+		.ok_or(anyhow!("no 'Solved' tag available here"))?; // plausible scenario (e.g. wrong forum, or non-forum thread)
+
+	let tags_old = &thread.applied_tags;
+
+	if tags_old.contains(&solved_tag.id) {
+		return Err(anyhow!("thread is already solved"));
+	}
+
+	let tags_new = tags_old
+		.iter()
+		.cloned()
+		.chain(iter::once(solved_tag.id));
+
+	thread.edit_thread(
+		ctx,
+		EditThread::new().applied_tags(tags_new)
+	).await?;
+
+	Ok(())
+}
 /// Edit a message by its ID
 ///
 /// /edit <message_id>

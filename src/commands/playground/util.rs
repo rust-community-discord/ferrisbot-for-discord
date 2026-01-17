@@ -287,11 +287,13 @@ pub fn maybe_wrapped(
 /// Send a Discord reply with the formatted contents of a Playground result
 pub async fn send_reply(
 	ctx: Context<'_>,
-	result: api::PlayResult,
+	mut result: api::PlayResult,
 	code: &str,
 	flags: &api::CommandFlags,
 	flag_parse_errors: &str,
 ) -> Result<(), Error> {
+	result.sanitize_backticks();
+
 	let result = crate::helpers::merge_output_and_errors(&result.stdout, &result.stderr);
 
 	// Discord displays empty code blocks weirdly if they're not formatted in a specific style,
@@ -304,7 +306,7 @@ pub async fn send_reply(
 	let timeout =
 		result.contains("Killed") && result.contains("timeout") && result.contains("--signal=KILL");
 
-	let mut text_end = String::from("```");
+	let mut text_end = String::from("\n```");
 	if timeout {
 		text_end += "Playground timeout detected";
 	}
@@ -421,7 +423,6 @@ pub fn format_play_eval_stderr(stderr: &str, show_compiler_warnings: bool) -> St
 		} else {
 			program_stderr.to_owned()
 		}
-		.replace('`', "\u{200b}`")
 	} else {
 		// Program didn't get to run, so there must be an error, so we yield the compiler output
 		// regardless of whether warn is enabled or not
