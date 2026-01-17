@@ -21,6 +21,16 @@ use tracing::{debug, info, warn};
 use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
 use crate::types::Data;
 
+const FAILED_CODEBLOCK: &str = "\\
+Missing code block. Please use the following markdown:
+`` `code here` ``
+or
+```ansi
+`\x1b[0m`\x1b[0m`rust
+code here
+`\x1b[0m`\x1b[0m`
+```";
+
 pub mod checks;
 pub mod commands;
 pub mod helpers;
@@ -32,6 +42,17 @@ impl SecretStore {
 	#[must_use]
 	pub fn get(&self, key: &str) -> Option<String> {
 		self.0.get(key).cloned()
+	}
+
+	/// Gets a secret and parses it as a Discord ID (u64).
+	///
+	/// # Errors
+	/// Returns an error if the key is missing or the value cannot be parsed as u64.
+	pub fn get_discord_id(&self, key: &str) -> Result<u64, Error> {
+		self.get(key)
+			.ok_or_else(|| anyhow!("Failed to get '{key}' from the secret store"))?
+			.parse::<u64>()
+			.map_err(|e| anyhow!("Failed to parse '{key}' as u64: {e}"))
 	}
 }
 
@@ -45,31 +66,26 @@ impl From<serenity::Client> for ShuttleSerenity {
 
 pub async fn serenity(
 	secret_store: SecretStore,
-	pool: sqlx::PgPool,
+	database: Option<sqlx::SqlitePool>,
 ) -> Result<ShuttleSerenity, Error> {
-	const FAILED_CODEBLOCK: &str = "\
-Missing code block. Please use the following markdown:
-`` `code here` ``
-or
-```ansi
-`\x1b[0m`\x1b[0m`rust
-code here
-`\x1b[0m`\x1b[0m`
-```";
-
 	let token = secret_store
 		.get("DISCORD_TOKEN")
 		.expect("Couldn't find your DISCORD_TOKEN!");
 
-	sqlx::migrate!()
-		.run(&pool)
-		.await
-		.expect("Failed to run migrations");
+	if let Some(pool) = database.as_ref() {
+		sqlx::migrate!()
+			.run(pool)
+			.await
+			.expect("Failed to run migrations");
+	}
+
+	let enable_database = database.is_some();
+	let command_list = build_command_list(enable_database);
 
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, pool).await?;
+				let data = Data::new(&secret_store, database).await?;
 
 				debug!("Registering commands...");
 				poise::builtins::register_in_guild(
@@ -89,45 +105,7 @@ code here
 			})
 		})
 		.options(poise::FrameworkOptions {
-			commands: vec![
-				commands::man::man(),
-				commands::crates::crate_(),
-				commands::crates::doc(),
-				commands::godbolt::godbolt(),
-				commands::godbolt::mca(),
-				commands::godbolt::llvmir(),
-				commands::godbolt::targets(),
-				commands::utilities::go(),
-				commands::utilities::source(),
-				commands::utilities::help(),
-				commands::utilities::register(),
-				commands::utilities::uptime(),
-				commands::utilities::conradluget(),
-				commands::utilities::cleanup(),
-				commands::utilities::ban(),
-				commands::utilities::selftimeout(),
-				commands::utilities::solved(),
-				commands::utilities::edit(),
-				commands::thread_pin::thread_pin(),
-				commands::modmail::modmail(),
-				commands::modmail::modmail_context_menu_for_message(),
-				commands::modmail::modmail_context_menu_for_user(),
-				commands::moving::move_messages_context_menu(),
-				commands::playground::play(),
-				commands::playground::playwarn(),
-				commands::playground::eval(),
-				commands::playground::miri(),
-				commands::playground::expand(),
-				commands::playground::clippy(),
-				commands::playground::fmt(),
-				commands::playground::microbench(),
-				commands::playground::procmacro(),
-				commands::highlight::highlight(),
-				commands::highlight::remove(),
-				commands::highlight::list(),
-				commands::highlight::add(),
-				commands::highlight::mat(),
-			],
+			commands: command_list,
 			prefix_options: poise::PrefixFrameworkOptions {
 				prefix: Some("?".into()),
 				additional_prefixes: vec![
@@ -156,7 +134,7 @@ code here
 			on_error: |error| {
 				Box::pin(async move {
 					warn!("Encountered error: {:?}", error);
-					if let poise::FrameworkError::ArgumentParse { error, ctx, .. } = error {
+					if let poise::FrameworkError::ArgumentParse { error, ctx, .. } = &error {
 						let response = if error.is::<poise::CodeBlockError>() {
 							FAILED_CODEBLOCK.to_owned()
 						} else if let Some(multiline_help) = &ctx.command().help_text {
@@ -165,18 +143,12 @@ code here
 							error.to_string()
 						};
 
-						if let Err(e) = ctx.say(response).await {
-							warn!("{}", e);
+						try_say(ctx, response).await;
+					} else if let poise::FrameworkError::Command { ctx, error, .. } = &error {
+						if error.is::<poise::CodeBlockError>() {
+							try_say(ctx, FAILED_CODEBLOCK).await;
 						}
-					} else if let poise::FrameworkError::Command { ctx, error, .. } = error {
-						if error.is::<poise::CodeBlockError>()
-							&& let Err(e) = ctx.say(FAILED_CODEBLOCK.to_owned()).await
-						{
-							warn!("{}", e);
-						}
-						if let Err(e) = ctx.say(error.to_string()).await {
-							warn!("{}", e);
-						}
+						try_say(ctx, error.to_string()).await;
 					}
 				})
 			},
@@ -231,6 +203,67 @@ code here
 	Ok(client.into())
 }
 
+fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>> {
+	let mut command_list = vec![
+		commands::man::man(),
+		commands::crates::crate_(),
+		commands::crates::doc(),
+		commands::godbolt::godbolt(),
+		commands::godbolt::mca(),
+		commands::godbolt::llvmir(),
+		commands::godbolt::targets(),
+		commands::utilities::go(),
+		commands::utilities::source(),
+		commands::utilities::help(),
+		commands::utilities::register(),
+		commands::utilities::uptime(),
+		commands::utilities::conradluget(),
+		commands::utilities::cleanup(),
+		commands::utilities::ban(),
+		commands::utilities::selftimeout(),
+		commands::utilities::solved(),
+		commands::utilities::edit(),
+		commands::thread_pin::thread_pin(),
+		commands::modmail::modmail(),
+		commands::modmail::modmail_context_menu_for_message(),
+		commands::modmail::modmail_context_menu_for_user(),
+		commands::moving::move_messages_context_menu(),
+		commands::playground::play(),
+		commands::playground::playwarn(),
+		commands::playground::eval(),
+		commands::playground::miri(),
+		commands::playground::expand(),
+		commands::playground::clippy(),
+		commands::playground::fmt(),
+		commands::playground::microbench(),
+		commands::playground::procmacro(),
+	];
+	if enable_database {
+		command_list.extend([
+			commands::highlight::highlight(),
+			commands::highlight::remove(),
+			commands::highlight::list(),
+			commands::highlight::add(),
+			commands::highlight::mat(),
+		]);
+	}
+	command_list
+}
+
+/// Attempts to send a message, logging any failures.
+/// This is useful for error handling paths where we don't want to fail the entire operation
+/// if we can't send an error message.
+async fn try_say(ctx: &poise::Context<'_, Data, Error>, message: impl Into<String>) {
+	let msg = message.into();
+	if let Err(e) = ctx.say(&msg).await {
+		warn!(
+			"Failed to send message '{}...': {}",
+			&msg[..msg.len().min(50)],
+			e
+		);
+	}
+}
+
 async fn event_handler(
 	ctx: &serenity::Context,
 	event: &serenity::FullEvent,
@@ -241,55 +274,53 @@ async fn event_handler(
 		event.snake_case_name()
 	);
 
-	if let serenity::FullEvent::GuildMemberAddition { new_member } = event {
-		const RUSTIFICATION_DELAY: u64 = 30; // in minutes
+	match event {
+		serenity::FullEvent::GuildMemberAddition { new_member } => {
+			const RUSTIFICATION_DELAY: u64 = 30; // in minutes
 
-		tokio::time::sleep(std::time::Duration::from_secs(RUSTIFICATION_DELAY * 60)).await;
+			tokio::time::sleep(Duration::from_secs(RUSTIFICATION_DELAY * 60)).await;
 
-		// Ignore errors because the user may have left already
-		let _: Result<_, _> = ctx
-			.http
-			.add_member_role(
-				new_member.guild_id,
-				new_member.user.id,
-				data.rustacean_role_id,
-				Some(&format!(
-					"Automatically rustified after {RUSTIFICATION_DELAY} minutes"
-				)),
-			)
-			.await;
-	}
-
-	if let serenity::FullEvent::Ready { .. } = event {
-		let http = ctx.http.clone();
-		tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
-	}
-
-	if let serenity::FullEvent::Message { new_message } = event {
-		if !new_message.author.bot {
-			for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
-				_ = person
-					.direct_message(
-						ctx,
-						serenity::CreateMessage::new().content(format!(
-							"your match `{matcher}` was satisfied on message ```\n{}\n``` {}",
-							new_message.content.replace('`', "​`"),
-							new_message.link()
-						)),
-					)
-					.await;
+			// Ignore errors because the user may have left already
+			let _: Result<_, _> = ctx
+				.http
+				.add_member_role(
+					new_member.guild_id,
+					new_member.user.id,
+					data.rustacean_role_id,
+					Some(&format!(
+						"Automatically rustified after {RUSTIFICATION_DELAY} minutes"
+					)),
+				)
+				.await;
+		}
+		serenity::FullEvent::Ready { .. } => {
+			let http = ctx.http.clone();
+			tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
+		}
+		serenity::FullEvent::Message { new_message } => {
+			if !new_message.author.bot {
+				for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
+					_ = person
+						.direct_message(
+							ctx,
+							serenity::CreateMessage::new().content(format!(
+								"your match `{matcher}` was satisfied on message ```\n{}\n``` {}",
+								new_message.content.replace('`', "`"),
+								new_message.link()
+							)),
+						)
+						.await;
+				}
 			}
 		}
-	}
-
-	if let serenity::FullEvent::InteractionCreate {
-		interaction: serenity::Interaction::Component(component),
-		..
-	} = event
-		&& component.data.custom_id == "rplcs_create_new_modmail"
-	{
-		let message = "Created from modmail button";
-		create_modmail_thread(ctx, message, data, component.user.id).await?;
+		serenity::FullEvent::InteractionCreate {
+			interaction: serenity::Interaction::Component(component),
+			..
+		} if component.data.custom_id == "rplcs_create_new_modmail" => {
+			let message = "Created from modmail button";
+			create_modmail_thread(ctx, message, data, component.user.id).await?;
+		}
+		_ => {}
 	}
 
 	Ok(())
@@ -298,15 +329,7 @@ async fn event_handler(
 async fn fetch_icon_paths() -> tokio::io::Result<Box<[PathBuf]>> {
 	let mut icon_paths = Vec::new();
 	let mut icon_path_iter = tokio::fs::read_dir("./assets/server-icons").await?;
-	loop {
-		let Ok(entry_opt) = icon_path_iter.next_entry().await else {
-			continue;
-		};
-
-		let Some(entry) = entry_opt else {
-			break;
-		};
-
+	while let Some(entry) = icon_path_iter.next_entry().await? {
 		let path = entry.path();
 		if path.is_file() {
 			icon_paths.push(path);
@@ -323,6 +346,11 @@ async fn init_server_icon_changer(
 	let icon_paths = fetch_icon_paths()
 		.await
 		.map_err(|e| anyhow!("Failed to read server-icons directory: {e}"))?;
+
+	if icon_paths.is_empty() {
+		warn!("No server icons found in assets/server-icons; skipping icon rotation");
+		return Ok(());
+	}
 
 	loop {
 		// Attempt to find all images and select one at random

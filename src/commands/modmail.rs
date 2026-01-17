@@ -1,10 +1,20 @@
-use anyhow::{Error, anyhow};
+use anyhow::{Context as AnyhowContext, Error, anyhow};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{EditThread, GuildChannel, Mentionable, UserId};
 use rand::Rng;
 use tracing::{debug, info};
 
 use crate::types::{Context, Data};
+
+/// Sends a success response after creating a modmail thread.
+async fn send_modmail_success(ctx: Context<'_>, modmail: &GuildChannel) -> Result<(), Error> {
+	ctx.say(format!(
+		"Successfully sent your message to the moderators. Check out your modmail thread here: {}",
+		modmail.mention()
+	))
+	.await?;
+	Ok(())
+}
 
 /// Opens a modmail thread for a message. To use, right-click the message that
 /// you want to report, then go to "Apps" > "Open Modmail".
@@ -25,11 +35,7 @@ pub async fn modmail_context_menu_for_message(
 		message.content_safe(ctx)
 	);
 	let modmail = create_modmail_thread(ctx, message, ctx.data(), ctx.author().id).await?;
-	ctx.say(format!(
-		"Successfully sent your message to the moderators. Check out your modmail thread here: {}",
-		modmail.mention()
-	))
-	.await?;
+	send_modmail_success(ctx, &modmail).await?;
 	Ok(())
 }
 
@@ -50,11 +56,7 @@ pub async fn modmail_context_menu_for_user(
 		user.id, user.name
 	);
 	let modmail = create_modmail_thread(ctx, message, ctx.data(), ctx.author().id).await?;
-	ctx.say(format!(
-		"Successfully sent your message to the moderators. Check out your modmail thread here: {}",
-		modmail.mention()
-	))
-	.await?;
+	send_modmail_success(ctx, &modmail).await?;
 	Ok(())
 }
 
@@ -83,11 +85,7 @@ pub async fn modmail(
 		ctx.channel_id().mention()
 	);
 	let modmail = create_modmail_thread(ctx, message, ctx.data(), ctx.author().id).await?;
-	ctx.say(format!(
-		"Successfully sent your message to the moderators. Check out your modmail thread here: {}",
-		modmail.mention()
-	))
-	.await?;
+	send_modmail_success(ctx, &modmail).await?;
 	Ok(())
 }
 
@@ -106,9 +104,9 @@ pub async fn load_or_create_modmail_message(
 		.modmail_channel_id
 		.to_channel(&http)
 		.await
-		.map_err(|e| anyhow!(e).context("Cannot enter modmail channel"))?
+		.context("Cannot enter modmail channel")?
 		.guild()
-		.ok_or(anyhow!("This command can only be used in a guild"))?;
+		.ok_or_else(|| anyhow!("Modmail channel is not a guild channel"))?;
 
 	// Fetch the report message itself
 	let open_report_message = modmail_guild_channel
@@ -175,9 +173,10 @@ pub async fn create_modmail_thread(
 
 	let modmail_channel = modmail_message
 		.channel(&http)
-		.await?
+		.await
+		.context("Failed to fetch modmail channel")?
 		.guild()
-		.ok_or(anyhow!("Modmail channel is not in a guild!"))?;
+		.ok_or_else(|| anyhow!("Modmail channel is not in a guild"))?;
 
 	let modmail_name = format!("Modmail #{}", rand::rng().random_range(1..10000));
 

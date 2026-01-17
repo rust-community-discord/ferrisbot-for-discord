@@ -3,12 +3,12 @@ use std::{
 	ops::Not as _,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use futures::StreamExt as _;
 use itertools::Itertools;
 use poise::{
-	modal::execute_modal_on_component_interaction, serenity_prelude::*, ChoiceParameter,
-	CreateReply, ReplyHandle,
+	ChoiceParameter, CreateReply, ReplyHandle, modal::execute_modal_on_component_interaction,
+	serenity_prelude::*,
 };
 
 use crate::types::Context;
@@ -589,20 +589,22 @@ impl MoveOptionsDialog {
 				.max_values(1)
 				.placeholder("Which channel should messages be moved to?"),
 			),
-			MoveOptionComponent::ExecuteButton => {
-				CreateActionRow::Buttons(vec![CreateButton::new(custom_id)
+			MoveOptionComponent::ExecuteButton => CreateActionRow::Buttons(vec![
+				CreateButton::new(custom_id)
 					.style(ButtonStyle::Danger)
-					.label("Move")])
-			}
+					.label("Move"),
+			]),
 			MoveOptionComponent::ChangeNameButton => {
 				let label = if self.destination == MoveDestinationOption::NewForumPost {
 					"Change forum post name"
 				} else {
 					"Change thread name"
 				};
-				CreateActionRow::Buttons(vec![CreateButton::new(custom_id)
-					.style(ButtonStyle::Secondary)
-					.label(label)])
+				CreateActionRow::Buttons(vec![
+					CreateButton::new(custom_id)
+						.style(ButtonStyle::Secondary)
+						.label(label),
+				])
 			}
 		}
 	}

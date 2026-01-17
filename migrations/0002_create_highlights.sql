@@ -1,5 +1,6 @@
 -- Add migration script here
 create table if not exists highlights (
-    id bigint primary key not null,
-    highlight text[] not null
+    id integer not null,
+    highlight text not null,
+    primary key (id, highlight)
 );

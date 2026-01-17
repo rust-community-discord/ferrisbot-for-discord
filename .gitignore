@@ -15,8 +15,15 @@ Cargo.lock
 
 # Misc secret files
 .env
+.env.local
 .*/
 ferris.secrets.toml
+ferris.toml
+database/
+*.sqlite3
+*.db
+logs/
+logs-bkp/
 
 # Allow the .github folder
 !.github/

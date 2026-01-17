@@ -12,6 +12,16 @@ pub use targets::*;
 
 const LLVM_MCA_TOOL_ID: &str = "llvm-mcatrunk";
 
+/// Returns the tools JSON array for Godbolt requests.
+/// If `run_llvm_mca` is true, includes the llvm-mca tool; otherwise returns an empty array.
+fn make_tools_json(run_llvm_mca: bool) -> serde_json::Value {
+	if run_llvm_mca {
+		serde_json::json!([{"id": LLVM_MCA_TOOL_ID}])
+	} else {
+		serde_json::json!([])
+	}
+}
+
 struct Compilation {
 	output: String,
 	stderr: String,
@@ -66,15 +76,7 @@ async fn compile_rust_source(
 	http: &reqwest::Client,
 	request: &GodboltRequest<'_>,
 ) -> Result<Compilation, Error> {
-	let tools = if request.run_llvm_mca {
-		serde_json::json! {
-			[{"id": LLVM_MCA_TOOL_ID}]
-		}
-	} else {
-		serde_json::json! {
-			[]
-		}
-	};
+	let tools = make_tools_json(request.run_llvm_mca);
 
 	let http_request = http
 		.post(format!(
@@ -120,15 +122,7 @@ async fn save_to_shortlink(http: &reqwest::Client, req: &GodboltRequest<'_>) -> 
 		url: String,
 	}
 
-	let tools = if req.run_llvm_mca {
-		serde_json::json! {
-			[{"id": LLVM_MCA_TOOL_ID}]
-		}
-	} else {
-		serde_json::json! {
-			[]
-		}
-	};
+	let tools = make_tools_json(req.run_llvm_mca);
 
 	let request = http
 		.post("https://godbolt.org/api/shortener")

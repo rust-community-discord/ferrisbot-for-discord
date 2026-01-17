@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  rustbot:
+    build: '.'
+    env_file: '.env'
+    restart: 'unless-stopped'
+    volumes:
+    - type: bind
+      source: ./database/ferris.sqlite3
+      target: /usr/src/app/database/ferris.sqlite3
+    - type: bind
+      source: ./logs
+      target: /usr/src/app/logs

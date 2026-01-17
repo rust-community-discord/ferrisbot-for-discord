@@ -23,6 +23,7 @@ poise = { version = "0.6", default-features = false, features = [
 ] }
 proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
 rand = "0.9"
+regex = "1.10"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -30,11 +31,12 @@ reqwest = { version = "0.12", default-features = false, features = [
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 snafu = "0.8.9"
+strum = { version = "0.27", features = ["derive"] }
+subenum = "0.1"
 sqlx = { version = "0.8.6", features = [
   "macros",
-  "postgres",
+  "sqlite",
   "runtime-tokio",
-  "tls-rustls",
 ] }
 syn = { version = "2.0.104", default-features = false, features = [
   "full",

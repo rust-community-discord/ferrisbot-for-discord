@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, panic, path::PathBuf, sync::LazyLock};
+use std::{collections::HashMap, fs, panic, path::PathBuf, str::FromStr, sync::LazyLock};
 
 use ferrisbot_for_discord::SecretStore;
 use figment::{
@@ -8,7 +8,7 @@ use figment::{
 use serde::Deserialize;
 use serde_json::json;
 use snafu::{Report, ResultExt as _, Snafu};
-use sqlx::PgPool;
+use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use tokio::runtime::Runtime;
 use tracing::{debug, error, info, level_filters::LevelFilter, warn};
 use tracing_appender::rolling::{self, RollingFileAppender, Rotation};
@@ -49,7 +49,7 @@ static DEFAULT_CONFIG: LazyLock<serde_json::Value> = LazyLock::new(|| {
 			"max_files": 10,
 		},
 		"database": {
-			"url": "postgresql://localhost/ferris"
+			"url": "sqlite://database/ferris.sqlite3"
 		},
 		"secrets": {}
 	})
@@ -68,13 +68,35 @@ enum LogRotation {
 fn app(config: &Config) -> Result<(), AppError> {
 	let rt = Runtime::new().context(TokioRuntimeSnafu)?;
 	rt.block_on(async {
-		info!("connecting to Postgres database...");
+		let disable_database = std::env::var("FERRIS_DISABLE_DATABASE")
+			.map(|value| {
+				matches!(
+					value.to_ascii_lowercase().as_str(),
+					"1" | "true" | "yes" | "on"
+				)
+			})
+			.unwrap_or(false);
 
-		let pool = PgPool::connect(&config.database.url)
-			.await
-			.context(DatabaseSnafu {
-				url: config.database.url.to_owned(),
-			})?;
+		let pool = if disable_database {
+			warn!("database disabled via FERRIS_DISABLE_DATABASE");
+			None
+		} else {
+			info!("connecting to SQLite database...");
+
+			let opts = SqliteConnectOptions::from_str(&config.database.url)
+				.context(DatabaseSnafu {
+					url: config.database.url.to_owned(),
+				})?
+				.create_if_missing(true);
+
+			Some(
+				SqlitePool::connect_with(opts)
+					.await
+					.context(DatabaseSnafu {
+						url: config.database.url.to_owned(),
+					})?,
+			)
+		};
 
 		info!("initializing serenity...");
 
