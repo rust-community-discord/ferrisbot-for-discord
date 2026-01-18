@@ -206,6 +206,12 @@ impl MoveOptions {
 		start_msg: Message,
 	) -> Result<MoveDestination> {
 		match self {
+			Self::Channel { id } | Self::ExistingThread { thread_id: id, .. }
+				if *id == start_msg.channel_id =>
+			{
+				Err(anyhow!("source and destination cannot be the same"))
+			}
+
 			Self::Channel { id } => Ok(MoveDestination::Channel(*id)),
 			Self::ExistingThread {
 				thread_id,
@@ -415,10 +421,20 @@ impl MoveOptionsDialog {
 				self.selected_forum = get_selected_channel(&interaction);
 			}
 			MoveOptionComponent::Thread => {
-				self.selected_thread = get_selected_channel(&interaction);
+				let selected_thread = get_selected_channel(&interaction);
+
+				// Prevent us from selecting the thread we're already in.
+				if selected_thread.is_none_or(|c| c != self.initial_msg.channel_id) {
+					self.selected_thread = selected_thread;
+				}
 			}
 			MoveOptionComponent::Channel => {
-				self.selected_channel = get_selected_channel(&interaction);
+				let selected_channel = get_selected_channel(&interaction);
+
+				// Prevent us from selecting the channel we're already in.
+				if selected_channel.is_none_or(|c| c != self.initial_msg.channel_id) {
+					self.selected_channel = selected_channel;
+				}
 			}
 
 			MoveOptionComponent::ChangeNameButton => {
