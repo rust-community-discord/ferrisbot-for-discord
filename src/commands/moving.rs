@@ -449,7 +449,11 @@ impl MoveOptionsDialog {
 				let selected_thread = get_selected_channel(&interaction);
 
 				// Prevent us from selecting the thread we're already in.
-				if selected_thread.is_none_or(|c| c != self.initial_msg.channel_id) {
+				if self.destination == MoveDestinationOption::ExistingThread {
+					if selected_thread.is_none_or(|c| c != self.initial_msg.channel_id) {
+						self.selected_thread = selected_thread;
+					}
+				} else {
 					self.selected_thread = selected_thread;
 				}
 			}
@@ -457,7 +461,11 @@ impl MoveOptionsDialog {
 				let selected_channel = get_selected_channel(&interaction);
 
 				// Prevent us from selecting the channel we're already in.
-				if selected_channel.is_none_or(|c| c != self.initial_msg.channel_id) {
+				if self.destination == MoveDestinationOption::Channel {
+					if selected_channel.is_none_or(|c| c != self.initial_msg.channel_id) {
+						self.selected_channel = selected_channel;
+					}
+				} else {
 					self.selected_channel = selected_channel;
 				}
 			}
