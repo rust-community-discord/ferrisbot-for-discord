@@ -175,6 +175,13 @@ enum MoveOptionComponent {
 		NewForumPostComponent
 	)]
 	ExecuteButton,
+	#[subenum(
+		NewThreadComponent,
+		ExistingThreadComponent,
+		ChannelComponent,
+		NewForumPostComponent
+	)]
+	SetLastMessageButton,
 	#[subenum(NewThreadComponent, NewForumPostComponent)]
 	ChangeNameButton,
 }
@@ -185,7 +192,7 @@ impl MoveOptionComponent {
 	}
 
 	fn can_defer(self) -> bool {
-		matches!(self, Self::ChangeNameButton).not()
+		matches!(self, Self::ChangeNameButton | Self::SetLastMessageButton).not()
 	}
 }
 
@@ -320,6 +327,8 @@ struct MoveOptionsDialog {
 	involved_users: Vec<UserId>,
 
 	thread_name: String,
+	last_message_id: Option<MessageId>,
+
 	selected_users: Vec<UserId>,
 	selected_forum: Option<ChannelId>,
 	selected_thread: Option<ChannelId>,
@@ -348,6 +357,7 @@ impl MoveOptionsDialog {
 		let mut dialog = Self {
 			initial_msg,
 			thread_name: String::from("Moved conversation"),
+			last_message_id: None,
 			destination: MoveDestinationOption::default(),
 			involved_users: users.clone(),
 			selected_users: users,
@@ -383,6 +393,15 @@ impl MoveOptionsDialog {
 			#[min_length = 1]
 			#[max_length = 100]
 			thread_name: String,
+		}
+		#[derive(Debug, poise::Modal)]
+		#[name = "Thread settings"]
+		struct LastMessageModal {
+			#[name = "Last message ID"]
+			#[placeholder = "Input ID here"]
+			#[min_length = 1]
+			#[max_length = 100]
+			message_id: Option<String>,
 		}
 
 		let component: MoveOptionComponent = match interaction.data.custom_id.parse() {
@@ -456,6 +475,27 @@ impl MoveOptionsDialog {
 
 				if let Some(input) = thread_name_input {
 					self.thread_name = input.thread_name;
+				}
+			}
+			MoveOptionComponent::SetLastMessageButton => {
+				let last_message_input = execute_modal_on_component_interaction(
+					ctx,
+					interaction,
+					Some(LastMessageModal {
+						message_id: self.last_message_id.map(|id| id.to_string()),
+					}),
+					None,
+				)
+				.await?;
+
+				if let Some(input) = last_message_input {
+					if let Some(id) = input.message_id
+						&& let Ok(id) = id.parse::<u64>()
+					{
+						self.last_message_id = Some(MessageId::new(id));
+					} else {
+						self.last_message_id = None;
+					}
 				}
 			}
 			MoveOptionComponent::ExecuteButton => return self.build_move_options(ctx).await,
@@ -631,6 +671,11 @@ impl MoveOptionsDialog {
 						.label(label),
 				])
 			}
+			MoveOptionComponent::SetLastMessageButton => CreateActionRow::Buttons(vec![
+				CreateButton::new(custom_id)
+					.style(ButtonStyle::Secondary)
+					.label("Set last message"),
+			]),
 		}
 	}
 }
@@ -746,11 +791,33 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		messages
 	};
 
+	// If the user has set a message ID to stop at, but the message doesn't exist,
+	// use the creation date from the ID to figure out a stop time.
+	let (stop_at_id, stop_at_time) = if let Some(last_msg_id) = options.dialog.last_message_id {
+		if messages.iter().any(|m| m.id == last_msg_id) {
+			(Some(last_msg_id), None)
+		} else {
+			let last_msg_ts = last_msg_id.created_at();
+			(None, Some(last_msg_ts))
+		}
+	} else {
+		(None, None)
+	};
+
 	let filtered_messages = messages
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
 		.filter(message_posted_within_max_timespan)
-		.take(MESSAGE_LIMIT);
+		.take(MESSAGE_LIMIT)
+		.take_while_inclusive(|m| {
+			if let Some(stop_id) = stop_at_id {
+				m.id != stop_id
+			} else if let Some(stop_time) = stop_at_time {
+				m.id.created_at() < stop_time
+			} else {
+				true
+			}
+		});
 
 	let mut relayed_messages = Vec::new();
 	let mut original_users = HashMap::new();
