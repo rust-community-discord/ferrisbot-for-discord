@@ -13,6 +13,8 @@ use poise::{
 
 use crate::types::Context;
 
+const MESSAGE_LIMIT: usize = 100;
+
 #[poise::command(
 	context_menu_command = "Move Messages",
 	guild_only,
@@ -616,7 +618,12 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	let mut all_messages = start_msg
 		.channel_id
-		.messages(&ctx, GetMessages::new().after(start_msg.id))
+		.messages(
+			&ctx,
+			GetMessages::new()
+				.after(start_msg.id)
+				.limit(MESSAGE_LIMIT as _),
+		)
 		.await?;
 	all_messages.push(start_msg.clone());
 	all_messages.reverse();
@@ -681,7 +688,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	let filtered_messages = all_messages
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
-		.skip(offset);
+		.take(MESSAGE_LIMIT);
 
 	let mut relayed_messages = Vec::new();
 	let mut relay_error = None;
