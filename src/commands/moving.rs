@@ -235,16 +235,16 @@ enum MoveDestination {
 }
 
 impl MoveDestination {
-	const fn channel(self) -> ChannelId {
+	const fn id(self) -> ChannelId {
 		match self {
-			Self::Thread { channel, .. } | Self::Channel(channel) => channel,
+			Self::Channel(channel) => channel,
+			Self::Thread { thread, .. } => thread,
 		}
 	}
 
-	const fn thread(self) -> Option<ChannelId> {
+	const fn channel(self) -> ChannelId {
 		match self {
-			Self::Channel(..) => None,
-			Self::Thread { thread, .. } => Some(thread),
+			Self::Thread { channel, .. } | Self::Channel(channel) => channel,
 		}
 	}
 }
@@ -917,9 +917,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	}
 
 	// Post notice in destination.
-	destination
-		.thread()
-		.unwrap_or(destination.channel())
+	let notice_res = destination
+		.id()
 		.say(
 			&ctx,
 			format!(
@@ -941,7 +940,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	// Start collector to keep track of reactions to relayed messages.
 	let mut collector = ReactionCollector::new(&ctx)
-		.channel_id(destination.thread().unwrap_or(destination.channel()))
+		.channel_id(destination.id())
 		.timeout(Duration::from_hours(4));
 
 	if let Some(guild_id) = ctx.guild_id() {
@@ -964,7 +963,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	ctx.say(format!(
 		"{} moved a conversation from here to {}.",
 		Mention::from(ctx.author().id),
-		Mention::from(destination.thread().unwrap_or(destination.channel()))
+		Mention::from(destination.id())
 	))
 	.await?;
 
