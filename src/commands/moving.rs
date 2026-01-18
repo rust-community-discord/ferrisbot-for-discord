@@ -757,7 +757,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.get_or_create_channel(ctx, options.dialog.initial_msg.clone())
 		.await?;
 
-	let destination_lock = ChannelLock::wait_for_lock(&ctx, destination.channel()).await?;
+	let destination_lock = ChannelLock::wait_for_lock(&ctx, destination.id()).await?;
 
 	let webhook = destination
 		.channel()
