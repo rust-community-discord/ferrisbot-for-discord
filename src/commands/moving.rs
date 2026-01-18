@@ -240,28 +240,7 @@ impl MoveOptions {
 						&ctx,
 						CreateForumPost::new(
 							post_name,
-							CreateMessage::new()
-								.add_embeds(start_msg.embeds.into_iter().map(Into::into).collect())
-								.add_files({
-									let mut attachments = Vec::new();
-
-									for attachment in start_msg.attachments {
-										attachments.push(
-											CreateAttachment::url(&ctx, &attachment.url).await?,
-										);
-									}
-
-									attachments
-								})
-								.add_sticker_ids(
-									start_msg
-										.sticker_items
-										.into_iter()
-										.map(|s| s.id)
-										.collect_vec(),
-								)
-								.content(start_msg.content)
-								.flags(start_msg.flags.unwrap_or_default()),
+							CreateMessage::new().content("Moved conversation"),
 						),
 					)
 					.await?;
@@ -301,6 +280,7 @@ impl MoveOptionsDialog {
 		initial_msg: Message,
 		users: Vec<UserId>,
 	) -> Result<CreatedMoveOptionsDialog<'_>> {
+		// Select forum immediately if there's only one.
 		let selected_forum = initial_msg.guild(ctx.cache()).and_then(|g| {
 			g.channels
 				.values()
