@@ -15,7 +15,7 @@ use poise::{
 
 use crate::types::Context;
 
-const MESSAGE_LIMIT: usize = 100;
+const MESSAGE_LIMIT: u8 = 100;
 const MAX_TIME_SPAN: Duration = Duration::from_hours(2);
 
 #[poise::command(
@@ -39,8 +39,10 @@ impl<'ctx> ChannelLock<'ctx> {
 		let data = ctx.data();
 
 		// Ignore poison, as a thread that panics while holding this lock won't execute any more code.
-		let (Ok(mut locked_channels) | Err(mut locked_channels)) =
-			data.move_channel_locks.lock().map_err(|e| e.into_inner());
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) = data
+			.move_channel_locks
+			.lock()
+			.map_err(std::sync::PoisonError::into_inner);
 
 		if locked_channels.contains(&channel) {
 			return None;
@@ -72,8 +74,10 @@ impl<'ctx> ChannelLock<'ctx> {
 
 impl Drop for ChannelLock<'_> {
 	fn drop(&mut self) {
-		let (Ok(mut locked_channels) | Err(mut locked_channels)) =
-			self.mutex.lock().map_err(|e| e.into_inner());
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) = self
+			.mutex
+			.lock()
+			.map_err(std::sync::PoisonError::into_inner);
 
 		// Remove lock from channel.
 		locked_channels.remove(&self.channel);
@@ -697,9 +701,7 @@ async fn get_messages_after_and_including_msg(
 		.channel_id
 		.messages(
 			&ctx,
-			GetMessages::new()
-				.after(start_msg.id)
-				.limit(MESSAGE_LIMIT as _),
+			GetMessages::new().after(start_msg.id).limit(MESSAGE_LIMIT),
 		)
 		.await?;
 
@@ -816,7 +818,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
 		.filter(message_posted_within_max_timespan)
-		.take(MESSAGE_LIMIT)
+		.take(MESSAGE_LIMIT as _)
 		.take_while_inclusive(|m| {
 			if let Some(stop_id) = stop_at_id {
 				m.id != stop_id
@@ -944,10 +946,14 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		)
 		.await;
 
+	if let Err(e) = notice_res {
+		tracing::warn!(err = %e, "failed to send notice to move destination");
+	}
+
 	drop(destination_lock);
 
 	// Start collector to keep track of reactions to relayed messages.
-	let mut collector = ReactionCollector::new(&ctx)
+	let mut collector = ReactionCollector::new(ctx)
 		.channel_id(destination.id())
 		.timeout(Duration::from_hours(4));
 
@@ -957,7 +963,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	tokio::spawn({
 		let ctx = ctx.serenity_context().clone();
-		async move { listen_for_reactions(ctx, collector, webhook, relayed_messages, original_users) }
+		listen_for_reactions(ctx, collector, webhook, relayed_messages, original_users)
 	});
 
 	// Delete the original messages.
@@ -1051,9 +1057,7 @@ async fn listen_for_reactions(
 					let ctx = ctx.clone();
 					let message = message.clone();
 					let webhook = webhook.clone();
-					async move {
-						prompt_user_for_edit_to_relayed_message(ctx, user_id, message, webhook)
-					}
+					prompt_user_for_edit_to_relayed_message(ctx, user_id, message, webhook)
 				});
 
 				if let Err(e) = reaction.delete(&ctx).await {
