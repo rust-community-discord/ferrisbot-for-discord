@@ -733,6 +733,19 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		time_span < MAX_TIME_SPAN
 	};
 
+	// If we haven't already gathered enough messages to reach the max timespan, fetch
+	// messages again, because more could have been posted after we started this interaction.
+	let should_refetch_messages = match messages.last() {
+		Some(last) => message_posted_within_max_timespan(last),
+		None => true,
+	};
+
+	let messages = if should_refetch_messages {
+		get_messages_after_and_including_msg(&ctx, &start_msg).await?
+	} else {
+		messages
+	};
+
 	let filtered_messages = messages
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
