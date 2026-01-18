@@ -932,7 +932,9 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.say(
 			&ctx,
 			format!(
-				"{}\n{} moved the conversation from {} to here.",
+				"{} moved the conversation from {} to here.\nParticipants: {}",
+				Mention::from(ctx.author().id),
+				Mention::from(ctx.channel_id()),
 				options
 					.dialog
 					.selected_users
@@ -940,8 +942,6 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 					.copied()
 					.map(Mention::from)
 					.join(""),
-				Mention::from(ctx.author().id),
-				Mention::from(ctx.channel_id())
 			),
 		)
 		.await;
