@@ -1,84 +1,85 @@
 name: CI
 
 on:
-	push:
-	pull_request:
-	workflow_dispatch:
+  push:
+  pull_request:
+  workflow_dispatch:
+
 
 concurrency:
-	group: ci-${{ github.workflow }}-${{ github.ref }}
-	cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-	contents: read
+  contents: read
 
 env:
-	CARGO_TERM_COLOR: always
-	RUST_BACKTRACE: 1
-	FERRIS_DISABLE_DATABASE: "1"
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  FERRIS_DISABLE_DATABASE: "1"
 
 jobs:
-	fmt:
-		name: Format (rustfmt)
-		runs-on: ubuntu-latest
-		timeout-minutes: 10
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  fmt:
+    name: 'Format (rustfmt)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-			- name: Install Rust (stable + rustfmt)
-				uses: dtolnay/rust-toolchain@stable
-				with:
-					components: rustfmt
+    - name: Install Rust (stable + rustfmt)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
 
-			- name: Rust cache
-				uses: Swatinem/rust-cache@v2
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2
 
-			- name: cargo fmt --check
-				run: cargo fmt --all --check
+    - name: cargo fmt --check
+      run: cargo fmt --all --check
 
-	clippy:
-		name: Lint (clippy)
-		runs-on: ubuntu-latest
-		timeout-minutes: 15
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  clippy:
+    name: 'Lint (clippy)'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-			- name: Install Rust (stable + clippy)
-				uses: dtolnay/rust-toolchain@stable
-				with:
-					components: clippy
+    - name: Install Rust (stable + clippy)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
 
-			- name: Rust cache
-				uses: Swatinem/rust-cache@v2
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2
 
-			- name: cargo clippy
-				run: cargo clippy --all-targets -- -D warnings
+    - name: cargo clippy
+      run: cargo clippy --all-targets -- -D warnings
 
-	test:
-		name: Test (${{ matrix.rust }}, ${{ matrix.os }})
-		runs-on: ${{ matrix.os }}
-		timeout-minutes: 30
-		strategy:
-			fail-fast: false
-			matrix:
-				include:
-					- rust: stable
-						os: ubuntu-latest
-					- rust: beta
-						os: ubuntu-latest
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  test:
+    name: 'Test (${{ matrix.rust }}, ${{ matrix.os }})'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - rust: stable
+          os: ubuntu-latest
+        - rust: beta
+          os: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-			- name: Install Rust (${{ matrix.rust }})
-				uses: dtolnay/rust-toolchain@master
-				with:
-					toolchain: ${{ matrix.rust }}
+    - name: Install Rust (${{ matrix.rust }})
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
 
-			- name: Rust cache
-				uses: Swatinem/rust-cache@v2
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2
 
-			- name: cargo test
-				run: cargo test --all-targets
+    - name: cargo test
+      run: cargo test --all-targets
