@@ -13,6 +13,17 @@ use poise::{
 
 use crate::types::Context;
 
+#[poise::command(
+	context_menu_command = "Move Messages",
+	guild_only,
+	default_member_permissions = "MANAGE_MESSAGES",
+	required_permissions = "MANAGE_MESSAGES",
+	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
+)]
+pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
+	Box::pin(move_messages(ctx, msg)).await
+}
+
 #[derive(Copy, Clone, Default, PartialEq, Eq, poise::ChoiceParameter)]
 enum MoveDestinationOption {
 	#[default]
@@ -283,16 +294,6 @@ impl MoveOptions {
 			}
 		}
 	}
-}
-
-#[poise::command(
-	context_menu_command = "Move Messages",
-	guild_only,
-	default_member_permissions = "MANAGE_MESSAGES | SEND_MESSAGES_IN_THREADS | CREATE_PUBLIC_THREADS",
-	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
-)]
-pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
-	Box::pin(move_messages(ctx, msg)).await
 }
 
 struct CreatedMoveOptionsDialog<'a> {
