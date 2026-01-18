@@ -16,6 +16,7 @@ use poise::{
 use crate::types::Context;
 
 const MESSAGE_LIMIT: usize = 100;
+const MAX_TIME_SPAN: Duration = Duration::from_hours(2);
 
 #[poise::command(
 	context_menu_command = "Move Messages",
@@ -634,13 +635,12 @@ impl MoveOptionsDialog {
 	}
 }
 
-async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
-	let _source_lock = ChannelLock::try_lock(&ctx, start_msg.channel_id)
-		.ok_or_else(|| anyhow!("channel is already used by another move operation"))?;
-
-	ctx.defer_ephemeral().await?;
-
-	let mut all_messages = start_msg
+/// Returns the messages in the order they were posted.
+async fn get_messages_after_and_including_msg(
+	ctx: &Context<'_>,
+	start_msg: &Message,
+) -> Result<Vec<Message>> {
+	let mut messages = start_msg
 		.channel_id
 		.messages(
 			&ctx,
@@ -649,23 +649,39 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 				.limit(MESSAGE_LIMIT as _),
 		)
 		.await?;
-	all_messages.push(start_msg.clone());
-	all_messages.reverse();
 
-	if all_messages.is_empty() {
+	messages.push(start_msg.clone());
+	messages.reverse();
+
+	Ok(messages)
+}
+
+async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
+	let _source_lock = ChannelLock::try_lock(&ctx, start_msg.channel_id)
+		.ok_or_else(|| anyhow!("channel is already used by another move operation"))?;
+
+	ctx.defer_ephemeral().await?;
+
+	let messages = get_messages_after_and_including_msg(&ctx, &start_msg).await?;
+
+	if messages.is_empty() {
 		ctx.say("No messages found").await?;
 		return Ok(());
 	}
 
-	let message_count_per_user: HashMap<&User, usize> =
-		all_messages.iter().map(|m| &m.author).counts();
-	let users_by_message_count = message_count_per_user
-		.keys()
-		.sorted_by_key(|&&u| message_count_per_user[u])
-		.map(|u| u.id)
-		.collect_vec();
+	let users_by_message_count = {
+		let message_count_per_user: HashMap<&User, usize> =
+			messages.iter().map(|m| &m.author).counts();
 
-	let mut options = MoveOptionsDialog::create(ctx, start_msg, users_by_message_count).await?;
+		message_count_per_user
+			.keys()
+			.sorted_by_key(|&&u| message_count_per_user[u])
+			.map(|u| u.id)
+			.collect_vec()
+	};
+
+	let mut options =
+		MoveOptionsDialog::create(ctx, start_msg.clone(), users_by_message_count).await?;
 
 	let options_handle = &options.handle;
 	let options_msg = options_handle.message().await?;
@@ -709,9 +725,18 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		)
 		.await?;
 
-	let filtered_messages = all_messages
+	let message_posted_within_max_timespan = |m: &Message| {
+		let time_span = (*m.timestamp - *start_msg.timestamp)
+			.to_std()
+			.unwrap_or(Duration::ZERO);
+
+		time_span < MAX_TIME_SPAN
+	};
+
+	let filtered_messages = messages
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
+		.filter(message_posted_within_max_timespan)
 		.take(MESSAGE_LIMIT);
 
 	let mut relayed_messages = Vec::new();
