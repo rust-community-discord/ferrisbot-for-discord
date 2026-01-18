@@ -787,8 +787,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	}
 
 	ctx.say(format!(
-		"Conversation moved from {} to {}.",
-		Mention::from(ctx.channel_id()),
+		"{} moved a conversation from here to {}.",
+		Mention::from(ctx.author().id),
 		Mention::from(destination.thread().unwrap_or(destination.channel()))
 	))
 	.await?;
