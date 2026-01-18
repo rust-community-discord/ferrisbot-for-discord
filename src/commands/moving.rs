@@ -169,22 +169,11 @@ enum MoveDestination {
 	Thread {
 		channel: ChannelId,
 		thread: ChannelId,
-		created_from_first_message: bool,
 		delete_on_fail: bool,
 	},
 }
 
 impl MoveDestination {
-	const fn skip_first_message(self) -> bool {
-		match self {
-			Self::Channel(..) => false,
-			Self::Thread {
-				created_from_first_message,
-				..
-			} => created_from_first_message,
-		}
-	}
-
 	const fn channel(self) -> ChannelId {
 		match self {
 			Self::Thread { channel, .. } | Self::Channel(channel) => channel,
@@ -219,7 +208,6 @@ impl MoveOptions {
 			} => Ok(MoveDestination::Thread {
 				channel: *channel_id,
 				thread: *thread_id,
-				created_from_first_message: false,
 				delete_on_fail: false,
 			}),
 
@@ -227,33 +215,18 @@ impl MoveOptions {
 				channel_id,
 				thread_name,
 			} => {
-				let create_from_first_message = *channel_id == ctx.channel_id();
-
-				let thread = if create_from_first_message {
-					channel_id
-						.create_thread_from_message(
-							&ctx,
-							start_msg.id,
-							CreateThread::new(thread_name)
-								.kind(ChannelType::PublicThread)
-								.audit_log_reason("moved conversation"),
-						)
-						.await?
-				} else {
-					channel_id
-						.create_thread(
-							&ctx,
-							CreateThread::new(thread_name)
-								.kind(ChannelType::PublicThread)
-								.audit_log_reason("moved conversation"),
-						)
-						.await?
-				};
+				let thread = channel_id
+					.create_thread(
+						&ctx,
+						CreateThread::new(thread_name)
+							.kind(ChannelType::PublicThread)
+							.audit_log_reason("moved conversation"),
+					)
+					.await?;
 
 				Ok(MoveDestination::Thread {
 					channel: *channel_id,
 					thread: thread.id,
-					created_from_first_message: create_from_first_message,
 					delete_on_fail: true,
 				})
 			}
@@ -296,7 +269,6 @@ impl MoveOptions {
 				Ok(MoveDestination::Thread {
 					channel: *forum_id,
 					thread: post.id,
-					created_from_first_message: true,
 					delete_on_fail: true,
 				})
 			}
@@ -698,8 +670,6 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			)),
 		)
 		.await?;
-
-	let offset = usize::from(destination.skip_first_message());
 
 	let filtered_messages = all_messages
 		.into_iter()
