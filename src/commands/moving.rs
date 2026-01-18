@@ -753,6 +753,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.take(MESSAGE_LIMIT);
 
 	let mut relayed_messages = Vec::new();
+	let mut original_users = HashMap::new();
 	let mut relay_error = None;
 
 	// Send messages to destination via webhook.
@@ -799,6 +800,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 		match webhook.execute(&ctx, true, builder).await {
 			Ok(Some(msg)) => {
+				original_users.insert(msg.id, message.author.id);
 				relayed_messages.push(msg);
 			}
 			Ok(None) => {
@@ -816,13 +818,13 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		}
 	}
 
-	// Try to delete webhook.
-	if let Err(e) = webhook.delete(&ctx).await {
-		tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
-	}
-
 	// Rollback relayed messages or new thread/forum post if anything failed.
 	if let Some(err) = relay_error {
+		// Try to delete webhook.
+		if let Err(e) = webhook.delete(&ctx).await {
+			tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
+		}
+
 		if let MoveDestination::Thread {
 			thread,
 			delete_on_fail,
@@ -870,6 +872,20 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	drop(destination_lock);
 
+	// Start collector to keep track of reactions to relayed messages.
+	let mut collector = ReactionCollector::new(&ctx)
+		.channel_id(destination.thread().unwrap_or(destination.channel()))
+		.timeout(Duration::from_hours(4));
+
+	if let Some(guild_id) = ctx.guild_id() {
+		collector = collector.guild_id(guild_id);
+	}
+
+	tokio::spawn({
+		let ctx = ctx.serenity_context().clone();
+		async move { listen_for_reactions(ctx, collector, webhook, relayed_messages, original_users) }
+	});
+
 	// Delete the original messages.
 	for msg in filtered_messages {
 		if let Err(e) = msg.delete(&ctx).await {
@@ -893,5 +909,165 @@ fn get_selected_channel(interaction: &ComponentInteraction) -> Option<ChannelId>
 		values.first().copied()
 	} else {
 		None
+	}
+}
+
+async fn listen_for_reactions(
+	ctx: poise::serenity_prelude::Context,
+	collector: ReactionCollector,
+	webhook: Webhook,
+	mut relayed_messages: Vec<Message>,
+	mut original_users: HashMap<MessageId, UserId>,
+) {
+	let (allowed_messages, allowed_users): (Vec<_>, Vec<_>) =
+		original_users.iter().map(|(m, u)| (*m, *u)).unzip();
+
+	// Cheap filter to reduce load.
+	let filter = move |reaction: &Reaction| {
+		if !allowed_messages.contains(&reaction.message_id) {
+			return false;
+		}
+		// Only allow reactions from the user who originally posted the message before it was relayed.
+		if reaction.user_id.is_none_or(|u| !allowed_users.contains(&u)) {
+			return false;
+		}
+
+		true
+	};
+
+	let mut collector = collector.filter(filter).stream();
+
+	while let Some(reaction) = collector.next().await {
+		let Some(&user_id) = original_users.get(&reaction.message_id) else {
+			continue;
+		};
+
+		let Some(message) = relayed_messages
+			.iter()
+			.find(|m| m.id == reaction.message_id)
+		else {
+			tracing::warn!("message exists in `original_users` but not in `relayed_messages`");
+			continue;
+		};
+
+		// Only allow reactions from the original poster of the message.
+		if Some(user_id) != reaction.user_id {
+			continue;
+		}
+
+		let ReactionType::Unicode(emoji) = &reaction.emoji else {
+			continue;
+		};
+
+		match emoji.as_str() {
+			// Delete message.
+			"❌" => {
+				if let Err(e) = message.delete(&ctx).await {
+					tracing::warn!(err = %e, "failed to delete relayed message");
+				}
+				original_users.remove(&message.id);
+
+				if let Some(idx) = relayed_messages.iter().position(|m| m.id == message.id) {
+					relayed_messages.swap_remove(idx);
+				}
+			}
+			// Edit message.
+			"📝" | "✏" => {
+				tokio::spawn({
+					let ctx = ctx.clone();
+					let message = message.clone();
+					let webhook = webhook.clone();
+					async move {
+						prompt_user_for_edit_to_relayed_message(ctx, user_id, message, webhook)
+					}
+				});
+
+				if let Err(e) = reaction.delete(&ctx).await {
+					tracing::warn!(err = %e, "failed to remove edit reaction");
+				}
+			}
+			_ => {}
+		}
+	}
+
+	// Try to delete webhook.
+	if let Err(e) = webhook.delete(&ctx).await {
+		tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
+	}
+}
+
+async fn prompt_user_for_edit_to_relayed_message(
+	ctx: poise::serenity_prelude::Context,
+	user_id: UserId,
+	message: Message,
+	webhook: Webhook,
+) {
+	let dm = match user_id.create_dm_channel(&ctx).await {
+		Ok(channel) => channel,
+		Err(e) => {
+			tracing::warn!(err = %e, "failed to DM user");
+			return;
+		}
+	};
+
+	let mut prompt_string = MessageBuilder::new();
+
+	prompt_string.push_bold_line("Original message:");
+
+	for line in message.content.lines() {
+		prompt_string.push_quote_line(line);
+	}
+
+	prompt_string.push_bold_line("\nPlease respond with your edit within the next five minutes:");
+
+	let mut prompt_string = prompt_string.build();
+	prompt_string.truncate(2048);
+
+	let prompt = match dm.say(&ctx, prompt_string).await {
+		Ok(msg) => msg,
+		Err(e) => {
+			tracing::warn!(err = %e, "failed to DM user");
+			return;
+		}
+	};
+
+	let Some(reply) = MessageCollector::new(&ctx)
+		.channel_id(dm.id)
+		.timeout(Duration::from_mins(5))
+		.next()
+		.await
+	else {
+		if let Err(e) = prompt.delete(&ctx).await {
+			tracing::warn!(err = %e, "failed to delete edit prompt");
+		}
+		return;
+	};
+
+	let edit_result = webhook
+		.edit_message(
+			&ctx,
+			message.id,
+			EditWebhookMessage::new().content(&reply.content),
+		)
+		.await;
+
+	if let Err(e) = edit_result {
+		tracing::warn!(err = %e, "failed to edit relayed message");
+
+		let reply_result = reply
+			.reply_ping(
+				&ctx,
+				format!("Failed to edit message, webhook has likely been deleted: {e}"),
+			)
+			.await;
+
+		if let Err(e) = reply_result {
+			tracing::warn!(err = %e, "failed to notify user of failure to edit");
+		}
+		return;
+	}
+
+	if let Err(e) = prompt.delete(&ctx).await {
+		tracing::warn!(err = %e, "failed to delete edit prompt in DM");
 	}
 }
