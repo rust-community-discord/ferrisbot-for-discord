@@ -684,7 +684,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.skip(offset);
 
 	let mut relayed_messages = Vec::new();
-	let mut abort_relaying = false;
+	let mut relay_error = None;
 
 	// Send messages to destination via webhook.
 	for message in filtered_messages.clone() {
@@ -729,19 +729,19 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 				tracing::error!(
 					"failed to wait for message, which shouldn't happen because we tell it to wait"
 				);
-				abort_relaying = true;
+				relay_error = Some(anyhow!("failed to wait for webhook message"));
 				break;
 			}
 			Err(e) => {
 				tracing::warn!(err = %e, "failed to create relayed message");
-				abort_relaying = true;
+				relay_error = Some(e.into());
 				break;
 			}
 		}
 	}
 
 	// Rollback relayed messages or new thread/forum post if anything failed.
-	if abort_relaying {
+	if let Some(err) = relay_error {
 		if let MoveDestination::Thread {
 			thread,
 			delete_on_fail,
@@ -750,7 +750,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			&& delete_on_fail
 		{
 			match thread.delete(&ctx).await {
-				Ok(_) => return Err(anyhow!("failed to move messages")),
+				Ok(_) => return Err(anyhow!("failed to move messages: {err}")),
 				Err(e) => {
 					tracing::warn!(err = %e, "failed to delete thread, deleting messages");
 				}
@@ -763,7 +763,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			}
 		}
 
-		return Err(anyhow!("failed to move messages"));
+		return Err(anyhow!("failed to move messages: {err}"));
 	}
 
 	// Delete the original messages.
