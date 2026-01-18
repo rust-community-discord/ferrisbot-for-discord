@@ -395,12 +395,12 @@ impl MoveOptionsDialog {
 			thread_name: String,
 		}
 		#[derive(Debug, poise::Modal)]
-		#[name = "Thread settings"]
+		#[name = "Set last message"]
 		struct LastMessageModal {
 			#[name = "Last message ID"]
 			#[placeholder = "Input ID here"]
-			#[min_length = 1]
-			#[max_length = 100]
+			#[min_length = 18]
+			#[max_length = 20]
 			message_id: Option<String>,
 		}
 
@@ -481,8 +481,8 @@ impl MoveOptionsDialog {
 				let last_message_input = execute_modal_on_component_interaction(
 					ctx,
 					interaction,
-					Some(LastMessageModal {
-						message_id: self.last_message_id.map(|id| id.to_string()),
+					self.last_message_id.map(|id| LastMessageModal {
+						message_id: Some(id.to_string()),
 					}),
 					None,
 				)
