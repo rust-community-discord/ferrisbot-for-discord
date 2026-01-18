@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Error, anyhow};
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity, Permissions};
 use rand::{Rng, seq::IteratorRandom};
 use tracing::{debug, info, warn};
 
@@ -298,18 +298,46 @@ async fn event_handler(
 			tokio::spawn(init_server_icon_changer(http, data.discord_guild_id));
 		}
 		serenity::FullEvent::Message { new_message } => {
-			if !new_message.author.bot {
+			if let Some(gid) = new_message.guild_id
+				&& !new_message.author.bot
+				&& let Some(guild) = ctx.cache.as_ref().guild(gid)
+			// dont leak private channels
+			// && include!("whitelist.channels").contains(&new_message.channel_id.get())
+			// if wanted, can add or pattern with role specific whitelists below
+			// doesnt seem like theres really a good discord way to do this
+			{
 				for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
-					_ = person
-						.direct_message(
-							ctx,
-							serenity::CreateMessage::new().content(format!(
-								"your match `{matcher}` was satisfied on message ```\n{}\n``` {}",
-								new_message.content.replace('`', "`"),
-								new_message.link()
-							)),
-						)
-						.await;
+					let Some(person) = guild.members.get(&person) else {
+						continue;
+					};
+					let channel = if let Some(channel) = guild.channels.get(&new_message.channel_id)
+					{
+						channel
+					} else if let Some(thread) = guild
+						.threads
+						.iter()
+						.find(|th| th.id == new_message.channel_id)
+					{
+						thread
+					} else {
+						continue;
+					};
+
+					let perms = guild
+						.user_permissions_in(channel, guild.members.get(&person.user.id).unwrap());
+
+					if perms.contains(Permissions::VIEW_CHANNEL) {
+						_ = person
+							.user
+							.direct_message(
+								ctx,
+								serenity::CreateMessage::new().content(format!(
+									"your match `{matcher}` was satisfied on message {}",
+									new_message.link()
+								)),
+							)
+							.await;
+					}
 				}
 			}
 		}
