@@ -300,35 +300,41 @@ async fn event_handler(
 		serenity::FullEvent::Message { new_message } => {
 			if let Some(gid) = new_message.guild_id
 				&& !new_message.author.bot
-				&& let Some(guild) = ctx.cache.as_ref().guild(gid)
 			// dont leak private channels
 			// && include!("whitelist.channels").contains(&new_message.channel_id.get())
 			// if wanted, can add or pattern with role specific whitelists below
 			// doesnt seem like theres really a good discord way to do this
 			{
 				for (person, matcher) in data.highlights.read().await.find(&new_message.content) {
-					let Some(person) = guild.members.get(&person) else {
-						continue;
-					};
-					let channel = if let Some(channel) = guild.channels.get(&new_message.channel_id)
-					{
-						channel
-					} else if let Some(thread) = guild
-						.threads
-						.iter()
-						.find(|th| th.id == new_message.channel_id)
-					{
-						thread
-					} else {
-						continue;
+					let can_user_view_message = {
+						let Some(guild) = ctx.cache.as_ref().guild(gid) else {
+							continue;
+						};
+
+						let Some(member) = guild.members.get(&person) else {
+							continue;
+						};
+
+						let channel =
+							if let Some(channel) = guild.channels.get(&new_message.channel_id) {
+								channel
+							} else if let Some(thread) = guild
+								.threads
+								.iter()
+								.find(|th| th.id == new_message.channel_id)
+							{
+								thread
+							} else {
+								continue;
+							};
+
+						guild
+							.user_permissions_in(channel, member)
+							.contains(Permissions::VIEW_CHANNEL)
 					};
 
-					let perms = guild
-						.user_permissions_in(channel, guild.members.get(&person.user.id).unwrap());
-
-					if perms.contains(Permissions::VIEW_CHANNEL) {
+					if can_user_view_message {
 						_ = person
-							.user
 							.direct_message(
 								ctx,
 								serenity::CreateMessage::new().content(format!(
