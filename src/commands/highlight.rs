@@ -29,6 +29,7 @@ macro_rules! require_database {
 	};
 }
 
+#[allow(clippy::unused_async)]
 #[poise::command(
 	prefix_command,
 	slash_command,
@@ -43,22 +44,29 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 /// Adds a highlight. When a highlight is matched, you will receive a DM.
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
+
 	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
 		c.say(format!("```\n{e}```")).await?;
 		return Ok(());
 	}
-	sqlx::query(
-		"
-	insert into highlights (id, highlight)
-	    values (?1, ?2)
-	on conflict (id, highlight) do nothing",
+
+	let author_id = c.author().id.get() as i64;
+
+	sqlx::query!(
+		r#"
+		insert into highlights (id, highlight)
+			values (?1, ?2)
+			on conflict (id, highlight) do nothing
+		"#,
+		author_id,
+		regex
 	)
-	.bind(c.author().id.get() as i64)
-	.bind(&regex)
 	.execute(db)
 	.await?;
-	c.say("hl added!").await?;
+
 	RegexHolder::update(c.data()).await;
+	c.say("hl added!").await?;
+
 	Ok(())
 }
 
@@ -205,7 +213,7 @@ impl RegexHolder {
 				}
 			};
 			match Regex::new(&highlight) {
-				Ok(regex) => entries.push((UserId::new(id as u64), regex)),
+				Ok(regex) => entries.push((UserId::new(id.cast_unsigned()), regex)),
 				Err(e) => warn!("Invalid regex pattern '{highlight}' for user {id}: {e}"),
 			}
 		}

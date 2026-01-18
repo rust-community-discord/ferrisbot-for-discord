@@ -292,7 +292,7 @@ impl MoveOptions {
 	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
 )]
 pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
-	move_messages(ctx, msg).await
+	Box::pin(move_messages(ctx, msg)).await
 }
 
 struct CreatedMoveOptionsDialog<'a> {
@@ -746,14 +746,15 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			delete_on_fail,
 			..
 		} = destination
-			&& delete_on_fail {
-				match thread.delete(&ctx).await {
-					Ok(_) => return Err(anyhow!("failed to move messages")),
-					Err(e) => {
-						tracing::warn!(err = %e, "failed to delete thread, deleting messages");
-					}
+			&& delete_on_fail
+		{
+			match thread.delete(&ctx).await {
+				Ok(_) => return Err(anyhow!("failed to move messages")),
+				Err(e) => {
+					tracing::warn!(err = %e, "failed to delete thread, deleting messages");
 				}
 			}
+		}
 
 		for msg in relayed_messages {
 			if let Err(e) = msg.delete(&ctx).await {
