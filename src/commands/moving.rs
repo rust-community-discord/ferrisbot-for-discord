@@ -778,6 +778,27 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		return Err(anyhow!("failed to move messages: {err}"));
 	}
 
+	// Post notice in destination.
+	destination
+		.thread()
+		.unwrap_or(destination.channel())
+		.say(
+			&ctx,
+			format!(
+				"{}\n{} moved the conversation from {} to here.",
+				options
+					.dialog
+					.selected_users
+					.iter()
+					.copied()
+					.map(Mention::from)
+					.join(""),
+				Mention::from(ctx.author().id),
+				Mention::from(ctx.channel_id())
+			),
+		)
+		.await;
+
 	// Delete the original messages.
 	for msg in filtered_messages {
 		if let Err(e) = msg.delete(&ctx).await {
