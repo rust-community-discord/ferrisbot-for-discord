@@ -688,6 +688,13 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	// Send messages to destination via webhook.
 	for message in filtered_messages.clone() {
+		// Prevent us from trying to send empty messages.
+		let text = if message.content.is_empty() {
+			String::from("_ _")
+		} else {
+			message.content.clone()
+		};
+
 		let mut builder = ExecuteWebhook::new()
 			.allowed_mentions(CreateAllowedMentions::new())
 			.username(
@@ -696,7 +703,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 					.await
 					.unwrap_or(message.author.display_name().to_owned()),
 			)
-			.content(message.content)
+			.content(text)
 			.embeds(message.embeds.into_iter().map(Into::into).collect())
 			.files({
 				let mut attachments = Vec::new();
