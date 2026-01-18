@@ -740,6 +740,11 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		}
 	}
 
+	// Try to delete webhook.
+	if let Err(e) = webhook.delete(&ctx).await {
+		tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
+	}
+
 	// Rollback relayed messages or new thread/forum post if anything failed.
 	if let Some(err) = relay_error {
 		if let MoveDestination::Thread {
