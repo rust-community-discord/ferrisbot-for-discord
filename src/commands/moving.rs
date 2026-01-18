@@ -251,6 +251,13 @@ impl MoveDestination {
 			Self::Thread { channel, .. } | Self::Channel(channel) => channel,
 		}
 	}
+
+	const fn thread(self) -> Option<ChannelId> {
+		match self {
+			Self::Channel(..) => None,
+			Self::Thread { thread, .. } => Some(thread),
+		}
+	}
 }
 
 impl MoveOptions {
@@ -963,7 +970,14 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 	tokio::spawn({
 		let ctx = ctx.serenity_context().clone();
-		listen_for_reactions(ctx, collector, webhook, relayed_messages, original_users)
+		listen_for_reactions(
+			ctx,
+			collector,
+			webhook,
+			destination,
+			relayed_messages,
+			original_users,
+		)
 	});
 
 	// Delete the original messages.
@@ -996,6 +1010,7 @@ async fn listen_for_reactions(
 	ctx: poise::serenity_prelude::Context,
 	collector: ReactionCollector,
 	webhook: Webhook,
+	destination: MoveDestination,
 	mut relayed_messages: Vec<Message>,
 	mut original_users: HashMap<MessageId, UserId>,
 ) {
@@ -1052,12 +1067,18 @@ async fn listen_for_reactions(
 				}
 			}
 			// Edit message.
-			"📝" | "✏" => {
+			"📝" | "✏️" => {
 				tokio::spawn({
 					let ctx = ctx.clone();
 					let message = message.clone();
 					let webhook = webhook.clone();
-					prompt_user_for_edit_to_relayed_message(ctx, user_id, message, webhook)
+					prompt_user_for_edit_to_relayed_message(
+						ctx,
+						user_id,
+						message,
+						webhook,
+						destination,
+					)
 				});
 
 				if let Err(e) = reaction.delete(&ctx).await {
@@ -1079,6 +1100,7 @@ async fn prompt_user_for_edit_to_relayed_message(
 	user_id: UserId,
 	message: Message,
 	webhook: Webhook,
+	destination: MoveDestination,
 ) {
 	let dm = match user_id.create_dm_channel(&ctx).await {
 		Ok(channel) => channel,
@@ -1122,11 +1144,15 @@ async fn prompt_user_for_edit_to_relayed_message(
 	};
 
 	let edit_result = webhook
-		.edit_message(
-			&ctx,
-			message.id,
-			EditWebhookMessage::new().content(&reply.content),
-		)
+		.edit_message(&ctx, message.id, {
+			let builder = EditWebhookMessage::new().content(&reply.content);
+
+			if let Some(thread) = destination.thread() {
+				builder.in_thread(thread)
+			} else {
+				builder
+			}
+		})
 		.await;
 
 	if let Err(e) = edit_result {
