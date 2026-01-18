@@ -746,8 +746,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			delete_on_fail,
 			..
 		} = destination
-		{
-			if delete_on_fail {
+			&& delete_on_fail {
 				match thread.delete(&ctx).await {
 					Ok(_) => return Err(anyhow!("failed to move messages")),
 					Err(e) => {
@@ -755,7 +754,6 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 					}
 				}
 			}
-		}
 
 		for msg in relayed_messages {
 			if let Err(e) = msg.delete(&ctx).await {

@@ -296,7 +296,7 @@ pub async fn solved(ctx: Context<'_>) -> Result<(), Error> {
 		return Err(anyhow!("thread is already solved"));
 	}
 
-	let tags_new = tags_old.iter().cloned().chain(iter::once(solved_tag.id));
+	let tags_new = tags_old.iter().copied().chain(iter::once(solved_tag.id));
 
 	thread
 		.edit_thread(ctx, EditThread::new().applied_tags(tags_new))
@@ -306,7 +306,7 @@ pub async fn solved(ctx: Context<'_>) -> Result<(), Error> {
 }
 /// Edit a message by its ID
 ///
-/// /edit <message_id>
+/// /edit <`message_id`>
 ///
 /// Replaces the content of the specified message with your next message.
 /// Only moderators can use this command.
