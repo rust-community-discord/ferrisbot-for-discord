@@ -304,8 +304,8 @@ struct CreatedMoveOptionsDialog<'a> {
 struct MoveOptionsDialog {
 	initial_msg: Message,
 	destination: MoveDestinationOption,
+	involved_users: Vec<UserId>,
 
-	users: Vec<UserId>,
 	thread_name: String,
 	selected_users: Vec<UserId>,
 	selected_forum: Option<ChannelId>,
@@ -335,8 +335,8 @@ impl MoveOptionsDialog {
 			initial_msg,
 			thread_name: String::from("Moved conversation"),
 			destination: MoveDestinationOption::default(),
-			selected_users: users.clone(),
-			users,
+			involved_users: users.clone(),
+			selected_users: users,
 			selected_forum,
 			selected_thread: None,
 			selected_channel: None,
@@ -386,7 +386,7 @@ impl MoveOptionsDialog {
 		match component {
 			MoveOptionComponent::SelectUsers => {
 				if let ComponentInteractionDataKind::UserSelect { values } = interaction.data.kind {
-					self.users = values;
+					self.selected_users = values;
 				}
 			}
 			MoveOptionComponent::Destination => {
@@ -531,11 +531,11 @@ impl MoveOptionsDialog {
 				CreateSelectMenu::new(
 					custom_id,
 					CreateSelectMenuKind::User {
-						default_users: Some(self.selected_users.clone()),
+						default_users: Some(self.involved_users.clone()),
 					},
 				)
 				.placeholder("Which users should have their messages moved?")
-				.max_values(self.users.len() as _),
+				.max_values(self.involved_users.len() as _),
 			),
 			MoveOptionComponent::Destination => CreateActionRow::SelectMenu(
 				CreateSelectMenu::new(
