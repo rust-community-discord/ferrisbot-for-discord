@@ -1,6 +1,8 @@
 use std::{
 	collections::{HashMap, HashSet},
 	ops::Not as _,
+	sync::Mutex,
+	time::Duration,
 };
 
 use anyhow::{Result, anyhow};
@@ -24,6 +26,57 @@ const MESSAGE_LIMIT: usize = 100;
 )]
 pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
 	Box::pin(move_messages(ctx, msg)).await
+}
+
+struct ChannelLock<'ctx> {
+	mutex: &'ctx Mutex<HashSet<ChannelId>>,
+	channel: ChannelId,
+}
+
+impl<'ctx> ChannelLock<'ctx> {
+	fn try_lock(ctx: &Context<'ctx>, channel: ChannelId) -> Option<Self> {
+		let data = ctx.data();
+
+		// Ignore poison, as a thread that panics while holding this lock won't execute any more code.
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) =
+			data.move_channel_locks.lock().map_err(|e| e.into_inner());
+
+		if locked_channels.contains(&channel) {
+			return None;
+		}
+
+		locked_channels.insert(channel);
+		Some(ChannelLock {
+			mutex: &data.move_channel_locks,
+			channel,
+		})
+	}
+
+	async fn wait_for_lock(ctx: &Context<'ctx>, channel: ChannelId) -> Result<Self> {
+		let start = std::time::Instant::now();
+
+		while start.elapsed() < Duration::from_secs(120) {
+			if let Some(lock) = Self::try_lock(ctx, channel) {
+				return Ok(lock);
+			}
+
+			tokio::time::sleep(Duration::from_millis(100)).await;
+		}
+
+		Err(anyhow!(
+			"channel has been locked for over two minutes, giving up"
+		))
+	}
+}
+
+impl Drop for ChannelLock<'_> {
+	fn drop(&mut self) {
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) =
+			self.mutex.lock().map_err(|e| e.into_inner());
+
+		// Remove lock from channel.
+		locked_channels.remove(&self.channel);
+	}
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, poise::ChoiceParameter)]
@@ -582,6 +635,9 @@ impl MoveOptionsDialog {
 }
 
 async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
+	let _source_lock = ChannelLock::try_lock(&ctx, start_msg.channel_id)
+		.ok_or_else(|| anyhow!("channel is already used by another move operation"))?;
+
 	ctx.defer_ephemeral().await?;
 
 	let mut all_messages = start_msg
@@ -639,6 +695,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	let destination = move_options
 		.get_or_create_channel(ctx, options.dialog.initial_msg.clone())
 		.await?;
+
+	let destination_lock = ChannelLock::wait_for_lock(&ctx, destination.channel()).await?;
 
 	let webhook = destination
 		.channel()
@@ -771,6 +829,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			),
 		)
 		.await;
+
+	drop(destination_lock);
 
 	// Delete the original messages.
 	for msg in filtered_messages {
