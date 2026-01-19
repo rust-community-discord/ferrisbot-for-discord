@@ -89,13 +89,18 @@ fn app(config: &Config) -> Result<(), AppError> {
 				})?
 				.create_if_missing(true);
 
-			Some(
-				SqlitePool::connect_with(opts)
-					.await
-					.context(DatabaseSnafu {
-						url: config.database.url.to_owned(),
-					})?,
-			)
+			let pool = SqlitePool::connect_with(opts)
+				.await
+				.context(DatabaseSnafu {
+					url: config.database.url.to_owned(),
+				})?;
+
+			sqlx::migrate!()
+				.run(&pool)
+				.await
+				.expect("Failed to run migrations");
+
+			Some(pool)
 		};
 
 		info!("initializing serenity...");
@@ -114,7 +119,7 @@ fn app(config: &Config) -> Result<(), AppError> {
 
 		info!("starting serenity...");
 
-		client.0.start_autosharded().await.context(SerentitySnafu)?;
+		client.0.start_autosharded().await.context(SerenitySnafu)?;
 
 		info!("serenity stopped");
 
@@ -278,7 +283,7 @@ enum AppError {
 	#[snafu(display("failed to initialize serenity client"))]
 	SerenityInit { source: anyhow::Error },
 	#[snafu(display("serenity client failed"))]
-	Serentity {
+	Serenity {
 		#[snafu(source(from(poise::serenity_prelude::Error, Box::new)))]
 		source: Box<poise::serenity_prelude::Error>,
 	},

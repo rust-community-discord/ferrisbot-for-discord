@@ -7,7 +7,7 @@ use poise::{
 	serenity_prelude::{CreateEmbed, UserId},
 };
 use regex::{Regex, RegexBuilder};
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::{Pool, Sqlite};
 
 const DATABASE_DISABLED_MSG: &str = "Database is disabled; highlights are unavailable.";
 
@@ -54,9 +54,9 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 
 	sqlx::query!(
 		r#"
-		insert into highlights (id, highlight)
+		insert into highlights (member_id, highlight)
 			values (?1, ?2)
-			on conflict (id, highlight) do nothing
+			on conflict (member_id, highlight) do nothing
 		"#,
 		author_id,
 		regex
@@ -71,52 +71,49 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 }
 
 #[poise::command(prefix_command, slash_command)]
-/// Removes a highlight.
-pub async fn remove(c: Context<'_>, regex: String) -> Result<()> {
+/// Removes a highlight by ID.
+pub async fn remove(c: Context<'_>, id: i64) -> Result<()> {
 	let db = require_database!(c);
-	if let Err(e) = Regex::new(&regex) {
-		c.say(format!("```\n{e}```")).await?;
-		return Ok(());
-	}
-	let u = c.author().id.get() as i64;
-	c.say(
-		if sqlx::query_scalar::<Sqlite, i64>(
-			"select 1 from highlights where id = ?1 and highlight = ?2",
-		)
-		.bind(u)
-		.bind(&regex)
-		.fetch_optional(db)
-		.await?
-		.is_some()
-		{
-			sqlx::query("delete from highlights where id = ?1 and highlight = ?2")
-				.bind(u)
-				.bind(&regex)
-				.execute(db)
-				.await?;
+
+	let author = c.author().id.get() as i64;
+
+	let result = sqlx::query!(
+		"delete from highlights where id = ?1 and member_id = ?2",
+		id,
+		author
+	)
+	.execute(db)
+	.await?;
+
+	c.say({
+		if result.rows_affected() > 0 {
 			"hl removed!"
 		} else {
 			"hl not found."
-		},
-	)
+		}
+	})
 	.await?;
+
 	RegexHolder::update(c.data()).await;
+
 	Ok(())
 }
 
-async fn get(id: UserId, db: Option<&Pool<Sqlite>>) -> Result<Vec<String>> {
+async fn get(id: UserId, db: Option<&Pool<Sqlite>>) -> Result<Vec<(i64, String)>> {
 	let Some(db) = db else {
 		return Ok(Vec::new());
 	};
-	let rows = sqlx::query("select highlight from highlights where id = ?1")
-		.bind(id.get() as i64)
-		.fetch_all(db)
-		.await?;
+	let member_id = id.get() as i64;
+	let rows = sqlx::query!(
+		"select id, highlight from highlights where member_id = ?1",
+		member_id
+	)
+	.fetch_all(db)
+	.await?;
 
 	let mut highlights = Vec::new();
 	for row in rows {
-		let highlight: String = row.try_get("highlight")?;
-		highlights.push(highlight);
+		highlights.push((row.id, row.highlight));
 	}
 
 	Ok(highlights)
@@ -126,14 +123,19 @@ async fn get(id: UserId, db: Option<&Pool<Sqlite>>) -> Result<Vec<String>> {
 /// Lists your current highlights
 pub async fn list(c: Context<'_>) -> Result<()> {
 	let db = require_database!(c);
-	let x = get(c.author().id, Some(db)).await?;
+	let highlights = get(c.author().id, Some(db)).await?;
+	let description = highlights
+		.iter()
+		.map(|(id, highlight)| format!("**[{id}]** {highlight}"))
+		.collect::<Vec<_>>()
+		.join("\n");
 	poise::send_reply(
 		c,
 		CreateReply::default().embed(
 			CreateEmbed::new()
 				.color((0xFC, 0xCA, 0x4C))
 				.title("you're tracking these patterns")
-				.description(itertools::intersperse(x, "\n".to_string()).collect::<String>()),
+				.description(description),
 		),
 	)
 	.await?;
@@ -147,7 +149,7 @@ pub async fn matches(
 ) -> Result<Vec<String>> {
 	let patterns = get(author, db).await?;
 	let mut matched = Vec::new();
-	for pattern in patterns {
+	for (_id, pattern) in patterns {
 		if let Ok(regex) = Regex::new(&pattern)
 			&& regex.is_match(haystack)
 		{
@@ -185,7 +187,7 @@ impl RegexHolder {
 		let Some(db) = db else {
 			return Self(Vec::new());
 		};
-		let rows = match sqlx::query("select id, highlight from highlights")
+		let rows = match sqlx::query!("select member_id, highlight from highlights")
 			.fetch_all(db)
 			.await
 		{
@@ -198,23 +200,11 @@ impl RegexHolder {
 
 		let mut entries = Vec::new();
 		for row in rows {
-			let id: i64 = match row.try_get("id") {
-				Ok(id) => id,
-				Err(e) => {
-					warn!("Failed to get 'id' from highlight row: {e}");
-					continue;
-				}
-			};
-			let highlight: String = match row.try_get("highlight") {
-				Ok(highlight) => highlight,
-				Err(e) => {
-					warn!("Failed to get 'highlight' from row for user {id}: {e}");
-					continue;
-				}
-			};
+			let member_id = row.member_id;
+			let highlight = row.highlight;
 			match Regex::new(&highlight) {
-				Ok(regex) => entries.push((UserId::new(id.cast_unsigned()), regex)),
-				Err(e) => warn!("Invalid regex pattern '{highlight}' for user {id}: {e}"),
+				Ok(regex) => entries.push((UserId::new(member_id.cast_unsigned()), regex)),
+				Err(e) => warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}"),
 			}
 		}
 

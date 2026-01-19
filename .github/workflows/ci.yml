@@ -54,6 +54,9 @@ jobs:
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
 
+    - name: cargo sqlx prepare --check
+      run: cargo sqlx prepare --check
+
     - name: cargo clippy
       run: cargo clippy --all-targets -- -D warnings
 
@@ -80,6 +83,9 @@ jobs:
 
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
+
+    - name: cargo sqlx prepare --check
+      run: cargo sqlx prepare --check
 
     - name: cargo test
       run: cargo test --all-targets
