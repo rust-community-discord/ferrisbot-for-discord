@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Error, anyhow};
+use futures::StreamExt;
 use poise::serenity_prelude::{self as serenity, Permissions};
 use rand::{Rng, seq::IteratorRandom};
 use tracing::{debug, info, warn};
@@ -294,51 +295,42 @@ async fn event_handler(
 			if let Some(gid) = new_message.guild_id
 				&& !new_message.author.bot
 			{
-				let matches = data.highlights.read().await.find(&new_message.content);
-				if matches.is_empty() {
-					return Ok(());
-				}
-
+				let hl = data.highlights.read().await;
+				let matches = hl.find(&new_message.content);
 				let message_link = new_message.link();
-				let mut dm_targets: Vec<(serenity::User, String)> = Vec::new();
-				if let Some(guild) = ctx.cache.as_ref().guild(gid)
-				// dont leak private channels
-				// && include!("whitelist.channels").contains(&new_message.channel_id.get())
-				// if wanted, can add or pattern with role specific whitelists below
-				// doesnt seem like theres really a good discord way to do this
-				{
-					for (person_id, matcher) in matches {
-						let Some(member) = guild.members.get(&person_id) else {
-							continue;
+				let message_link = &*message_link;
+				let mut stream = futures::stream::iter(matches)
+					.map(|(person_id, matcher)| async move {
+						if let Ok(member) = gid.member(ctx, person_id).await
+							&& let Ok(p) = gid.to_partial_guild(ctx).await
+							&& let Ok(Some(channel)) = if let Ok(Some(x)) = p
+								.channels(ctx)
+								.await
+								.map(|x| x.get(&new_message.channel_id).cloned())
+							{
+								Ok(Some(x))
+							} else {
+								p.get_active_threads(ctx).await.map(|x| {
+									x.threads
+										.iter()
+										.find(|th| th.id == new_message.channel_id)
+										.map(|x| x.clone())
+								})
+							} && let perms = p.user_permissions_in(&channel, &member)
+							&& perms.contains(Permissions::VIEW_CHANNEL)
+						{
+							_ = person_id
+								.direct_message(
+									ctx,
+									serenity::CreateMessage::new().content(format!(
+										"your match `{matcher}` was satisfied on message {message_link}",
+									)),
+								)
+								.await;
 						};
-						let Some(channel) =
-							guild.channels.get(&new_message.channel_id).or_else(|| {
-								guild
-									.threads
-									.iter()
-									.find(|th| th.id == new_message.channel_id)
-							})
-						else {
-							continue;
-						};
-
-						let perms = guild.user_permissions_in(channel, member);
-						if perms.contains(Permissions::VIEW_CHANNEL) {
-							dm_targets.push((member.user.clone(), matcher));
-						}
-					}
-				}
-
-				for (user, matcher) in dm_targets {
-					_ = user
-						.direct_message(
-							ctx,
-							serenity::CreateMessage::new().content(format!(
-								"your match `{matcher}` was satisfied on message {message_link}",
-							)),
-						)
-						.await;
-				}
+					})
+					.buffer_unordered(8);
+				while let Some(()) = stream.next().await {}
 			}
 		}
 		serenity::FullEvent::InteractionCreate {
