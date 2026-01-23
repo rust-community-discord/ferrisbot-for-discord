@@ -217,13 +217,11 @@ impl RegexHolder {
 	}
 
 	#[must_use]
-	pub fn find(&self, haystack: &str) -> Vec<(UserId, String)> {
+	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
 		self.0
 			.iter()
 			.filter(|(_, regex)| regex.is_match(haystack))
 			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
-			.collect::<HashMap<_, _>>()
-			.into_iter()
 			.collect()
 	}
 }
