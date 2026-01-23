@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+	collections::HashSet,
+	sync::{Arc, Mutex as StdMutex},
+};
 
 use anyhow::{Error, Result};
 use poise::serenity_prelude as serenity;
@@ -19,7 +22,8 @@ pub struct Data {
 	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
-	pub godbolt_metadata: std::sync::Mutex<commands::godbolt::GodboltMetadata>,
+	pub godbolt_metadata: StdMutex<commands::godbolt::GodboltMetadata>,
+	pub move_channel_locks: StdMutex<HashSet<serenity::ChannelId>>,
 }
 
 impl Data {
@@ -39,7 +43,8 @@ impl Data {
 			modmail_message: Arc::default(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
-			godbolt_metadata: std::sync::Mutex::new(commands::godbolt::GodboltMetadata::default()),
+			godbolt_metadata: StdMutex::new(commands::godbolt::GodboltMetadata::default()),
+			move_channel_locks: StdMutex::new(HashSet::new()),
 		})
 	}
 }

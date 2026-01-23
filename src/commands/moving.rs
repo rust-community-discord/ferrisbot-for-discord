@@ -1,6 +1,8 @@
 use std::{
 	collections::{HashMap, HashSet},
 	ops::Not as _,
+	sync::Mutex,
+	time::Duration,
 };
 
 use anyhow::{Result, anyhow};
@@ -12,6 +14,75 @@ use poise::{
 };
 
 use crate::types::Context;
+
+const MESSAGE_LIMIT: u8 = 100;
+const MAX_TIME_SPAN: Duration = Duration::from_hours(2);
+
+#[poise::command(
+	context_menu_command = "Move Messages",
+	guild_only,
+	default_member_permissions = "MANAGE_MESSAGES",
+	required_permissions = "MANAGE_MESSAGES",
+	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
+)]
+pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
+	Box::pin(move_messages(ctx, msg)).await
+}
+
+struct ChannelLock<'ctx> {
+	mutex: &'ctx Mutex<HashSet<ChannelId>>,
+	channel: ChannelId,
+}
+
+impl<'ctx> ChannelLock<'ctx> {
+	fn try_lock(ctx: &Context<'ctx>, channel: ChannelId) -> Option<Self> {
+		let data = ctx.data();
+
+		// Ignore poison, as a thread that panics while holding this lock won't execute any more code.
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) = data
+			.move_channel_locks
+			.lock()
+			.map_err(std::sync::PoisonError::into_inner);
+
+		if locked_channels.contains(&channel) {
+			return None;
+		}
+
+		locked_channels.insert(channel);
+		Some(ChannelLock {
+			mutex: &data.move_channel_locks,
+			channel,
+		})
+	}
+
+	async fn wait_for_lock(ctx: &Context<'ctx>, channel: ChannelId) -> Result<Self> {
+		let start = std::time::Instant::now();
+
+		while start.elapsed() < Duration::from_secs(120) {
+			if let Some(lock) = Self::try_lock(ctx, channel) {
+				return Ok(lock);
+			}
+
+			tokio::time::sleep(Duration::from_millis(100)).await;
+		}
+
+		Err(anyhow!(
+			"channel has been locked for over two minutes, giving up"
+		))
+	}
+}
+
+impl Drop for ChannelLock<'_> {
+	fn drop(&mut self) {
+		let (Ok(mut locked_channels) | Err(mut locked_channels)) = self
+			.mutex
+			.lock()
+			.map_err(std::sync::PoisonError::into_inner);
+
+		// Remove lock from channel.
+		locked_channels.remove(&self.channel);
+	}
+}
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, poise::ChoiceParameter)]
 enum MoveDestinationOption {
@@ -108,6 +179,13 @@ enum MoveOptionComponent {
 		NewForumPostComponent
 	)]
 	ExecuteButton,
+	#[subenum(
+		NewThreadComponent,
+		ExistingThreadComponent,
+		ChannelComponent,
+		NewForumPostComponent
+	)]
+	SetLastMessageButton,
 	#[subenum(NewThreadComponent, NewForumPostComponent)]
 	ChangeNameButton,
 }
@@ -118,7 +196,7 @@ impl MoveOptionComponent {
 	}
 
 	fn can_defer(self) -> bool {
-		matches!(self, Self::ChangeNameButton).not()
+		matches!(self, Self::ChangeNameButton | Self::SetLastMessageButton).not()
 	}
 }
 
@@ -156,19 +234,15 @@ enum MoveDestination {
 	Thread {
 		channel: ChannelId,
 		thread: ChannelId,
-		created_from_first_message: bool,
 		delete_on_fail: bool,
 	},
 }
 
 impl MoveDestination {
-	const fn skip_first_message(self) -> bool {
+	const fn id(self) -> ChannelId {
 		match self {
-			Self::Channel(..) => false,
-			Self::Thread {
-				created_from_first_message,
-				..
-			} => created_from_first_message,
+			Self::Channel(channel) => channel,
+			Self::Thread { thread, .. } => thread,
 		}
 	}
 
@@ -193,6 +267,12 @@ impl MoveOptions {
 		start_msg: Message,
 	) -> Result<MoveDestination> {
 		match self {
+			Self::Channel { id } | Self::ExistingThread { thread_id: id, .. }
+				if *id == start_msg.channel_id =>
+			{
+				Err(anyhow!("source and destination cannot be the same"))
+			}
+
 			Self::Channel { id } => Ok(MoveDestination::Channel(*id)),
 			Self::ExistingThread {
 				thread_id,
@@ -200,7 +280,6 @@ impl MoveOptions {
 			} => Ok(MoveDestination::Thread {
 				channel: *channel_id,
 				thread: *thread_id,
-				created_from_first_message: false,
 				delete_on_fail: false,
 			}),
 
@@ -208,33 +287,18 @@ impl MoveOptions {
 				channel_id,
 				thread_name,
 			} => {
-				let create_from_first_message = *channel_id == ctx.channel_id();
-
-				let thread = if create_from_first_message {
-					channel_id
-						.create_thread_from_message(
-							&ctx,
-							start_msg.id,
-							CreateThread::new(thread_name)
-								.kind(ChannelType::PublicThread)
-								.audit_log_reason("moved conversation"),
-						)
-						.await?
-				} else {
-					channel_id
-						.create_thread(
-							&ctx,
-							CreateThread::new(thread_name)
-								.kind(ChannelType::PublicThread)
-								.audit_log_reason("moved conversation"),
-						)
-						.await?
-				};
+				let thread = channel_id
+					.create_thread(
+						&ctx,
+						CreateThread::new(thread_name)
+							.kind(ChannelType::PublicThread)
+							.audit_log_reason("moved conversation"),
+					)
+					.await?;
 
 				Ok(MoveDestination::Thread {
 					channel: *channel_id,
 					thread: thread.id,
-					created_from_first_message: create_from_first_message,
 					delete_on_fail: true,
 				})
 			}
@@ -248,28 +312,7 @@ impl MoveOptions {
 						&ctx,
 						CreateForumPost::new(
 							post_name,
-							CreateMessage::new()
-								.add_embeds(start_msg.embeds.into_iter().map(Into::into).collect())
-								.add_files({
-									let mut attachments = Vec::new();
-
-									for attachment in start_msg.attachments {
-										attachments.push(
-											CreateAttachment::url(&ctx, &attachment.url).await?,
-										);
-									}
-
-									attachments
-								})
-								.add_sticker_ids(
-									start_msg
-										.sticker_items
-										.into_iter()
-										.map(|s| s.id)
-										.collect_vec(),
-								)
-								.content(start_msg.content)
-								.flags(start_msg.flags.unwrap_or_default()),
+							CreateMessage::new().content("Moved conversation"),
 						),
 					)
 					.await?;
@@ -277,22 +320,11 @@ impl MoveOptions {
 				Ok(MoveDestination::Thread {
 					channel: *forum_id,
 					thread: post.id,
-					created_from_first_message: true,
 					delete_on_fail: true,
 				})
 			}
 		}
 	}
-}
-
-#[poise::command(
-	context_menu_command = "Move Messages",
-	guild_only,
-	default_member_permissions = "MANAGE_MESSAGES | SEND_MESSAGES_IN_THREADS | CREATE_PUBLIC_THREADS",
-	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
-)]
-pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
-	Box::pin(move_messages(ctx, msg)).await
 }
 
 struct CreatedMoveOptionsDialog<'a> {
@@ -303,9 +335,11 @@ struct CreatedMoveOptionsDialog<'a> {
 struct MoveOptionsDialog {
 	initial_msg: Message,
 	destination: MoveDestinationOption,
+	involved_users: Vec<UserId>,
 
-	users: Vec<UserId>,
 	thread_name: String,
+	last_message_id: Option<MessageId>,
+
 	selected_users: Vec<UserId>,
 	selected_forum: Option<ChannelId>,
 	selected_thread: Option<ChannelId>,
@@ -320,6 +354,7 @@ impl MoveOptionsDialog {
 		initial_msg: Message,
 		users: Vec<UserId>,
 	) -> Result<CreatedMoveOptionsDialog<'_>> {
+		// Select forum immediately if there's only one.
 		let selected_forum = initial_msg.guild(ctx.cache()).and_then(|g| {
 			g.channels
 				.values()
@@ -333,9 +368,10 @@ impl MoveOptionsDialog {
 		let mut dialog = Self {
 			initial_msg,
 			thread_name: String::from("Moved conversation"),
+			last_message_id: None,
 			destination: MoveDestinationOption::default(),
-			selected_users: users.clone(),
-			users,
+			involved_users: users.clone(),
+			selected_users: users,
 			selected_forum,
 			selected_thread: None,
 			selected_channel: None,
@@ -369,6 +405,15 @@ impl MoveOptionsDialog {
 			#[max_length = 100]
 			thread_name: String,
 		}
+		#[derive(Debug, poise::Modal)]
+		#[name = "Set last message"]
+		struct LastMessageModal {
+			#[name = "Last message ID"]
+			#[placeholder = "Input ID here"]
+			#[min_length = 18]
+			#[max_length = 20]
+			message_id: Option<String>,
+		}
 
 		let component: MoveOptionComponent = match interaction.data.custom_id.parse() {
 			Ok(c) => c,
@@ -385,7 +430,7 @@ impl MoveOptionsDialog {
 		match component {
 			MoveOptionComponent::SelectUsers => {
 				if let ComponentInteractionDataKind::UserSelect { values } = interaction.data.kind {
-					self.users = values;
+					self.selected_users = values;
 				}
 			}
 			MoveOptionComponent::Destination => {
@@ -412,10 +457,28 @@ impl MoveOptionsDialog {
 				self.selected_forum = get_selected_channel(&interaction);
 			}
 			MoveOptionComponent::Thread => {
-				self.selected_thread = get_selected_channel(&interaction);
+				let selected_thread = get_selected_channel(&interaction);
+
+				// Prevent us from selecting the thread we're already in.
+				if self.destination == MoveDestinationOption::ExistingThread {
+					if selected_thread.is_none_or(|c| c != self.initial_msg.channel_id) {
+						self.selected_thread = selected_thread;
+					}
+				} else {
+					self.selected_thread = selected_thread;
+				}
 			}
 			MoveOptionComponent::Channel => {
-				self.selected_channel = get_selected_channel(&interaction);
+				let selected_channel = get_selected_channel(&interaction);
+
+				// Prevent us from selecting the channel we're already in.
+				if self.destination == MoveDestinationOption::Channel {
+					if selected_channel.is_none_or(|c| c != self.initial_msg.channel_id) {
+						self.selected_channel = selected_channel;
+					}
+				} else {
+					self.selected_channel = selected_channel;
+				}
 			}
 
 			MoveOptionComponent::ChangeNameButton => {
@@ -431,6 +494,27 @@ impl MoveOptionsDialog {
 
 				if let Some(input) = thread_name_input {
 					self.thread_name = input.thread_name;
+				}
+			}
+			MoveOptionComponent::SetLastMessageButton => {
+				let last_message_input = execute_modal_on_component_interaction(
+					ctx,
+					interaction,
+					self.last_message_id.map(|id| LastMessageModal {
+						message_id: Some(id.to_string()),
+					}),
+					None,
+				)
+				.await?;
+
+				if let Some(input) = last_message_input {
+					if let Some(id) = input.message_id
+						&& let Ok(id) = id.parse::<u64>()
+					{
+						self.last_message_id = Some(MessageId::new(id));
+					} else {
+						self.last_message_id = None;
+					}
 				}
 			}
 			MoveOptionComponent::ExecuteButton => return self.build_move_options(ctx).await,
@@ -530,11 +614,11 @@ impl MoveOptionsDialog {
 				CreateSelectMenu::new(
 					custom_id,
 					CreateSelectMenuKind::User {
-						default_users: Some(self.selected_users.clone()),
+						default_users: Some(self.involved_users.clone()),
 					},
 				)
 				.placeholder("Which users should have their messages moved?")
-				.max_values(self.users.len() as _),
+				.max_values(self.involved_users.len() as _),
 			),
 			MoveOptionComponent::Destination => CreateActionRow::SelectMenu(
 				CreateSelectMenu::new(
@@ -606,34 +690,60 @@ impl MoveOptionsDialog {
 						.label(label),
 				])
 			}
+			MoveOptionComponent::SetLastMessageButton => CreateActionRow::Buttons(vec![
+				CreateButton::new(custom_id)
+					.style(ButtonStyle::Secondary)
+					.label("Set last message"),
+			]),
 		}
 	}
 }
 
+/// Returns the messages in the order they were posted.
+async fn get_messages_after_and_including_msg(
+	ctx: &Context<'_>,
+	start_msg: &Message,
+) -> Result<Vec<Message>> {
+	let mut messages = start_msg
+		.channel_id
+		.messages(
+			&ctx,
+			GetMessages::new().after(start_msg.id).limit(MESSAGE_LIMIT),
+		)
+		.await?;
+
+	messages.push(start_msg.clone());
+	messages.reverse();
+
+	Ok(messages)
+}
+
 async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
+	let _source_lock = ChannelLock::try_lock(&ctx, start_msg.channel_id)
+		.ok_or_else(|| anyhow!("channel is already used by another move operation"))?;
+
 	ctx.defer_ephemeral().await?;
 
-	let mut all_messages = start_msg
-		.channel_id
-		.messages(&ctx, GetMessages::new().after(start_msg.id))
-		.await?;
-	all_messages.push(start_msg.clone());
-	all_messages.reverse();
+	let messages = get_messages_after_and_including_msg(&ctx, &start_msg).await?;
 
-	if all_messages.is_empty() {
+	if messages.is_empty() {
 		ctx.say("No messages found").await?;
 		return Ok(());
 	}
 
-	let message_count_per_user: HashMap<&User, usize> =
-		all_messages.iter().map(|m| &m.author).counts();
-	let users_by_message_count = message_count_per_user
-		.keys()
-		.sorted_by_key(|&&u| message_count_per_user[u])
-		.map(|u| u.id)
-		.collect_vec();
+	let users_by_message_count = {
+		let message_count_per_user: HashMap<&User, usize> =
+			messages.iter().map(|m| &m.author).counts();
 
-	let mut options = MoveOptionsDialog::create(ctx, start_msg, users_by_message_count).await?;
+		message_count_per_user
+			.keys()
+			.sorted_by_key(|&&u| message_count_per_user[u])
+			.map(|u| u.id)
+			.collect_vec()
+	};
+
+	let mut options =
+		MoveOptionsDialog::create(ctx, start_msg.clone(), users_by_message_count).await?;
 
 	let options_handle = &options.handle;
 	let options_msg = options_handle.message().await?;
@@ -664,6 +774,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		.get_or_create_channel(ctx, options.dialog.initial_msg.clone())
 		.await?;
 
+	let destination_lock = ChannelLock::wait_for_lock(&ctx, destination.id()).await?;
+
 	let webhook = destination
 		.channel()
 		.create_webhook(
@@ -675,18 +787,68 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 		)
 		.await?;
 
-	let offset = usize::from(destination.skip_first_message());
+	let message_posted_within_max_timespan = |m: &Message| {
+		let time_span = (*m.timestamp - *start_msg.timestamp)
+			.to_std()
+			.unwrap_or(Duration::ZERO);
 
-	let filtered_messages = all_messages
+		time_span < MAX_TIME_SPAN
+	};
+
+	// If we haven't already gathered enough messages to reach the max timespan, fetch
+	// messages again, because more could have been posted after we started this interaction.
+	let should_refetch_messages = match messages.last() {
+		Some(last) => message_posted_within_max_timespan(last),
+		None => true,
+	};
+
+	let messages = if should_refetch_messages {
+		get_messages_after_and_including_msg(&ctx, &start_msg).await?
+	} else {
+		messages
+	};
+
+	// If the user has set a message ID to stop at, but the message doesn't exist,
+	// use the creation date from the ID to figure out a stop time.
+	let (stop_at_id, stop_at_time) = if let Some(last_msg_id) = options.dialog.last_message_id {
+		if messages.iter().any(|m| m.id == last_msg_id) {
+			(Some(last_msg_id), None)
+		} else {
+			let last_msg_ts = last_msg_id.created_at();
+			(None, Some(last_msg_ts))
+		}
+	} else {
+		(None, None)
+	};
+
+	let filtered_messages = messages
 		.into_iter()
 		.filter(|m| options.dialog.selected_users.contains(&m.author.id))
-		.skip(offset);
+		.filter(message_posted_within_max_timespan)
+		.take(MESSAGE_LIMIT as _)
+		.take_while_inclusive(|m| {
+			if let Some(stop_id) = stop_at_id {
+				m.id != stop_id
+			} else if let Some(stop_time) = stop_at_time {
+				m.id.created_at() < stop_time
+			} else {
+				true
+			}
+		});
 
 	let mut relayed_messages = Vec::new();
-	let mut abort_relaying = false;
+	let mut original_users = HashMap::new();
+	let mut relay_error = None;
 
 	// Send messages to destination via webhook.
 	for message in filtered_messages.clone() {
+		// Prevent us from trying to send empty messages.
+		let text = if message.content.is_empty() {
+			String::from("_ _")
+		} else {
+			message.content.clone()
+		};
+
 		let mut builder = ExecuteWebhook::new()
 			.allowed_mentions(CreateAllowedMentions::new())
 			.username(
@@ -695,7 +857,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 					.await
 					.unwrap_or(message.author.display_name().to_owned()),
 			)
-			.content(message.content)
+			.content(text)
 			.embeds(message.embeds.into_iter().map(Into::into).collect())
 			.files({
 				let mut attachments = Vec::new();
@@ -722,25 +884,31 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 
 		match webhook.execute(&ctx, true, builder).await {
 			Ok(Some(msg)) => {
+				original_users.insert(msg.id, message.author.id);
 				relayed_messages.push(msg);
 			}
 			Ok(None) => {
 				tracing::error!(
 					"failed to wait for message, which shouldn't happen because we tell it to wait"
 				);
-				abort_relaying = true;
+				relay_error = Some(anyhow!("failed to wait for webhook message"));
 				break;
 			}
 			Err(e) => {
 				tracing::warn!(err = %e, "failed to create relayed message");
-				abort_relaying = true;
+				relay_error = Some(e.into());
 				break;
 			}
 		}
 	}
 
 	// Rollback relayed messages or new thread/forum post if anything failed.
-	if abort_relaying {
+	if let Some(err) = relay_error {
+		// Try to delete webhook.
+		if let Err(e) = webhook.delete(&ctx).await {
+			tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
+		}
+
 		if let MoveDestination::Thread {
 			thread,
 			delete_on_fail,
@@ -749,7 +917,7 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			&& delete_on_fail
 		{
 			match thread.delete(&ctx).await {
-				Ok(_) => return Err(anyhow!("failed to move messages")),
+				Ok(_) => return Err(anyhow!("failed to move messages: {err}")),
 				Err(e) => {
 					tracing::warn!(err = %e, "failed to delete thread, deleting messages");
 				}
@@ -762,8 +930,55 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			}
 		}
 
-		return Err(anyhow!("failed to move messages"));
+		return Err(anyhow!("failed to move messages: {err}"));
 	}
+
+	// Post notice in destination.
+	let notice_res = destination
+		.id()
+		.say(
+			&ctx,
+			format!(
+				"{} moved the conversation from {} to here.\nParticipants: {}",
+				Mention::from(ctx.author().id),
+				Mention::from(ctx.channel_id()),
+				options
+					.dialog
+					.selected_users
+					.iter()
+					.copied()
+					.map(Mention::from)
+					.join(""),
+			),
+		)
+		.await;
+
+	if let Err(e) = notice_res {
+		tracing::warn!(err = %e, "failed to send notice to move destination");
+	}
+
+	drop(destination_lock);
+
+	// Start collector to keep track of reactions to relayed messages.
+	let mut collector = ReactionCollector::new(ctx)
+		.channel_id(destination.id())
+		.timeout(Duration::from_hours(4));
+
+	if let Some(guild_id) = ctx.guild_id() {
+		collector = collector.guild_id(guild_id);
+	}
+
+	tokio::spawn({
+		let ctx = ctx.serenity_context().clone();
+		listen_for_reactions(
+			ctx,
+			collector,
+			webhook,
+			destination,
+			relayed_messages,
+			original_users,
+		)
+	});
 
 	// Delete the original messages.
 	for msg in filtered_messages {
@@ -774,9 +989,9 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	}
 
 	ctx.say(format!(
-		"Conversation moved from {} to {}.",
-		Mention::from(ctx.channel_id()),
-		Mention::from(destination.thread().unwrap_or(destination.channel()))
+		"{} moved a conversation from here to {}.",
+		Mention::from(ctx.author().id),
+		Mention::from(destination.id())
 	))
 	.await?;
 
@@ -788,5 +1003,175 @@ fn get_selected_channel(interaction: &ComponentInteraction) -> Option<ChannelId>
 		values.first().copied()
 	} else {
 		None
+	}
+}
+
+async fn listen_for_reactions(
+	ctx: poise::serenity_prelude::Context,
+	collector: ReactionCollector,
+	webhook: Webhook,
+	destination: MoveDestination,
+	mut relayed_messages: Vec<Message>,
+	mut original_users: HashMap<MessageId, UserId>,
+) {
+	let (allowed_messages, allowed_users): (Vec<_>, Vec<_>) =
+		original_users.iter().map(|(m, u)| (*m, *u)).unzip();
+
+	// Cheap filter to reduce load.
+	let filter = move |reaction: &Reaction| {
+		if !allowed_messages.contains(&reaction.message_id) {
+			return false;
+		}
+		// Only allow reactions from the user who originally posted the message before it was relayed.
+		if reaction.user_id.is_none_or(|u| !allowed_users.contains(&u)) {
+			return false;
+		}
+
+		true
+	};
+
+	let mut collector = collector.filter(filter).stream();
+
+	while let Some(reaction) = collector.next().await {
+		let Some(&user_id) = original_users.get(&reaction.message_id) else {
+			continue;
+		};
+
+		let Some(message) = relayed_messages
+			.iter()
+			.find(|m| m.id == reaction.message_id)
+		else {
+			tracing::warn!("message exists in `original_users` but not in `relayed_messages`");
+			continue;
+		};
+
+		// Only allow reactions from the original poster of the message.
+		if Some(user_id) != reaction.user_id {
+			continue;
+		}
+
+		let ReactionType::Unicode(emoji) = &reaction.emoji else {
+			continue;
+		};
+
+		match emoji.as_str() {
+			// Delete message.
+			"❌" => {
+				if let Err(e) = message.delete(&ctx).await {
+					tracing::warn!(err = %e, "failed to delete relayed message");
+				}
+				original_users.remove(&message.id);
+
+				if let Some(idx) = relayed_messages.iter().position(|m| m.id == message.id) {
+					relayed_messages.swap_remove(idx);
+				}
+			}
+			// Edit message.
+			"📝" | "✏️" => {
+				tokio::spawn({
+					let ctx = ctx.clone();
+					let message = message.clone();
+					let webhook = webhook.clone();
+					prompt_user_for_edit_to_relayed_message(
+						ctx,
+						user_id,
+						message,
+						webhook,
+						destination,
+					)
+				});
+
+				if let Err(e) = reaction.delete(&ctx).await {
+					tracing::warn!(err = %e, "failed to remove edit reaction");
+				}
+			}
+			_ => {}
+		}
+	}
+
+	// Try to delete webhook.
+	if let Err(e) = webhook.delete(&ctx).await {
+		tracing::warn!(err = %e, "failed to delete webhook used for relaying messages");
+	}
+}
+
+async fn prompt_user_for_edit_to_relayed_message(
+	ctx: poise::serenity_prelude::Context,
+	user_id: UserId,
+	message: Message,
+	webhook: Webhook,
+	destination: MoveDestination,
+) {
+	let dm = match user_id.create_dm_channel(&ctx).await {
+		Ok(channel) => channel,
+		Err(e) => {
+			tracing::warn!(err = %e, "failed to DM user");
+			return;
+		}
+	};
+
+	let mut prompt_string = MessageBuilder::new();
+
+	prompt_string.push_bold_line("Original message:");
+
+	for line in message.content.lines() {
+		prompt_string.push_quote_line(line);
+	}
+
+	prompt_string.push_bold_line("\nPlease respond with your edit within the next five minutes:");
+
+	let mut prompt_string = prompt_string.build();
+	prompt_string.truncate(2048);
+
+	let prompt = match dm.say(&ctx, prompt_string).await {
+		Ok(msg) => msg,
+		Err(e) => {
+			tracing::warn!(err = %e, "failed to DM user");
+			return;
+		}
+	};
+
+	let Some(reply) = MessageCollector::new(&ctx)
+		.channel_id(dm.id)
+		.timeout(Duration::from_mins(5))
+		.next()
+		.await
+	else {
+		if let Err(e) = prompt.delete(&ctx).await {
+			tracing::warn!(err = %e, "failed to delete edit prompt");
+		}
+		return;
+	};
+
+	let edit_result = webhook
+		.edit_message(&ctx, message.id, {
+			let builder = EditWebhookMessage::new().content(&reply.content);
+
+			if let Some(thread) = destination.thread() {
+				builder.in_thread(thread)
+			} else {
+				builder
+			}
+		})
+		.await;
+
+	if let Err(e) = edit_result {
+		tracing::warn!(err = %e, "failed to edit relayed message");
+
+		let reply_result = reply
+			.reply_ping(
+				&ctx,
+				format!("Failed to edit message, webhook has likely been deleted: {e}"),
+			)
+			.await;
+
+		if let Err(e) = reply_result {
+			tracing::warn!(err = %e, "failed to notify user of failure to edit");
+		}
+		return;
+	}
+
+	if let Err(e) = prompt.delete(&ctx).await {
+		tracing::warn!(err = %e, "failed to delete edit prompt in DM");
 	}
 }
