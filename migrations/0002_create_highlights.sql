@@ -1,6 +1,7 @@
 -- Add migration script here
 create table if not exists highlights (
-    id integer not null,
+    id integer primary key autoincrement not null,
+    member_id integer not null,
     highlight text not null,
-    primary key (id, highlight)
+    unique (member_id, highlight)
 );

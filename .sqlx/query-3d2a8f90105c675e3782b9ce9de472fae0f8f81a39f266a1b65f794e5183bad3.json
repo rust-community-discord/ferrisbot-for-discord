@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "delete from highlights where id = ?1 and member_id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3d2a8f90105c675e3782b9ce9de472fae0f8f81a39f266a1b65f794e5183bad3"
+}
