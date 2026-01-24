@@ -17,7 +17,6 @@ Cargo.lock
 .env
 .env.local
 .*/
-!.sqlx/
 ferris.secrets.toml
 ferris.toml
 database/
