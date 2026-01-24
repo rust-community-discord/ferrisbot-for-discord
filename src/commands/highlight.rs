@@ -9,6 +9,7 @@ use poise::{
 use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Sqlite};
 
+#[allow(clippy::unused_async)]
 #[poise::command(
 	prefix_command,
 	slash_command,
@@ -154,11 +155,8 @@ impl RegexHolder {
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
 		self.0
 			.iter()
-			.filter_map(|(user_id, regex)| {
-				regex
-					.is_match(haystack)
-					.then(|| (*user_id, regex.as_str().to_string()))
-			})
+			.filter(|&(_user_id, regex)| regex.is_match(haystack))
+			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
 			.collect()
 	}
 }
