@@ -53,9 +53,9 @@ jobs:
 
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
-    
+
     - name: Install sqlx-cli
-      run: cargo install sqlx-cli
+      run: cargo binstall sqlx-cli
 
     - name: cargo sqlx prepare --check
       run: cargo sqlx prepare --check
@@ -88,7 +88,7 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Install sqlx-cli
-      run: cargo install sqlx-cli
+      run: cargo binstall sqlx-cli
 
     - name: cargo sqlx prepare --check
       run: cargo sqlx prepare --check
