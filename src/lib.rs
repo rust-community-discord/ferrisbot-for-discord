@@ -314,7 +314,7 @@ async fn event_handler(
 									x.threads
 										.iter()
 										.find(|th| th.id == new_message.channel_id)
-										.map(|x| x.clone())
+										.cloned()
 								})
 							} && let perms = p.user_permissions_in(&channel, &member)
 							&& perms.contains(Permissions::VIEW_CHANNEL)
@@ -327,7 +327,7 @@ async fn event_handler(
 									)),
 								)
 								.await;
-						};
+						}
 					})
 					.buffer_unordered(8);
 				while let Some(()) = stream.next().await {}
