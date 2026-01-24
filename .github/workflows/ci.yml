@@ -51,11 +51,13 @@ jobs:
       with:
         components: clippy
 
+    - name: Install cargo-sqlx
+      uses: taiki-e/install-action@v2
+      with:
+        tool: sqlx-cli
+
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
-
-    - name: Install sqlx-cli
-      run: cargo binstall sqlx-cli
 
     - name: cargo sqlx prepare --check
       run: cargo sqlx prepare --check
@@ -84,11 +86,13 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
 
+    - name: Install cargo-sqlx
+      uses: taiki-e/install-action@v2
+      with:
+        tool: sqlx-cli
+
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
-
-    - name: Install sqlx-cli
-      run: cargo binstall sqlx-cli
 
     - name: cargo sqlx prepare --check
       run: cargo sqlx prepare --check
