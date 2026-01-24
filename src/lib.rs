@@ -103,7 +103,7 @@ pub async fn serenity(
 
 				load_or_create_modmail_message(ctx, &data).await?;
 
-				info!("rustbot logged in as {}", ready.user.name);
+				info!("ferrisbot-for-discord logged in as {}", ready.user.name);
 				Ok(data)
 			})
 		})
