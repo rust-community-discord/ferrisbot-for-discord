@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "select id, highlight from highlights where member_id = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "highlight",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a3a5f66c9eb088af7484de7dd24e952eb75bbea5018208bff26c532cd014e143"
+}
