@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT name as \"name!\", content as \"content!\", creator_user_id as \"creator_user_id!\", last_editor_user_id, creation_date as \"creation_date!\", last_edit_date, times_used as \"times_used!\", restricted as \"restricted!\" FROM tags WHERE creator_user_id = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "content!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "creator_user_id!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_editor_user_id",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "creation_date!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_edit_date",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "times_used!",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "restricted!",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "6888ce41439597ad9076a21bd57f44df7d9d6d2b0363d5be3cea6fe459a20b24"
+}

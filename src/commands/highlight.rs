@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::Context;
+use crate::{require_database, types::Context};
 use anyhow::{Error, Result};
 use poise::{
 	CreateReply,
@@ -9,27 +9,6 @@ use poise::{
 use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Sqlite};
 
-const DATABASE_DISABLED_MSG: &str = "Database is disabled; highlights are unavailable.";
-
-fn database_pool<'a>(c: &'a Context<'_>) -> Option<&'a Pool<Sqlite>> {
-	c.data().database.as_ref()
-}
-
-/// Helper macro to get the database pool or return early with an error message.
-/// This reduces repetitive boilerplate in highlight commands.
-macro_rules! require_database {
-	($ctx:expr) => {
-		match database_pool(&$ctx) {
-			Some(db) => db,
-			None => {
-				$ctx.say(DATABASE_DISABLED_MSG).await?;
-				return Ok(());
-			}
-		}
-	};
-}
-
-#[allow(clippy::unused_async)]
 #[poise::command(
 	prefix_command,
 	slash_command,
@@ -50,19 +29,7 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 		return Ok(());
 	}
 
-	let author_id = c.author().id.get() as i64;
-
-	sqlx::query!(
-		r#"
-		insert into highlights (member_id, highlight)
-			values (?1, ?2)
-			on conflict (member_id, highlight) do nothing
-		"#,
-		author_id,
-		regex
-	)
-	.execute(db)
-	.await?;
+	database::highlight_add(db, c.author().id, &regex).await?;
 
 	RegexHolder::update(c.data()).await;
 	c.say("hl added!").await?;
@@ -75,18 +42,10 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 pub async fn remove(c: Context<'_>, id: i64) -> Result<()> {
 	let db = require_database!(c);
 
-	let author = c.author().id.get() as i64;
-
-	let result = sqlx::query!(
-		"delete from highlights where id = ?1 and member_id = ?2",
-		id,
-		author
-	)
-	.execute(db)
-	.await?;
+	let removed = database::highlight_remove(db, c.author().id, id).await?;
 
 	c.say({
-		if result.rows_affected() > 0 {
+		if removed {
 			"hl removed!"
 		} else {
 			"hl not found."
@@ -99,31 +58,11 @@ pub async fn remove(c: Context<'_>, id: i64) -> Result<()> {
 	Ok(())
 }
 
-async fn get(id: UserId, db: Option<&Pool<Sqlite>>) -> Result<Vec<(i64, String)>> {
-	let Some(db) = db else {
-		return Ok(Vec::new());
-	};
-	let member_id = id.get() as i64;
-	let rows = sqlx::query!(
-		"select id, highlight from highlights where member_id = ?1",
-		member_id
-	)
-	.fetch_all(db)
-	.await?;
-
-	let mut highlights = Vec::new();
-	for row in rows {
-		highlights.push((row.id, row.highlight));
-	}
-
-	Ok(highlights)
-}
-
 #[poise::command(prefix_command, slash_command)]
 /// Lists your current highlights
 pub async fn list(c: Context<'_>) -> Result<()> {
 	let db = require_database!(c);
-	let highlights = get(c.author().id, Some(db)).await?;
+	let highlights = database::highlight_get(db, c.author().id).await?;
 	let description = highlights
 		.iter()
 		.map(|(id, highlight)| format!("**[{id}]** {highlight}"))
@@ -142,28 +81,24 @@ pub async fn list(c: Context<'_>) -> Result<()> {
 	Ok(())
 }
 
-pub async fn matches(
-	author: UserId,
-	haystack: &str,
-	db: Option<&Pool<Sqlite>>,
-) -> Result<Vec<String>> {
-	let patterns = get(author, db).await?;
-	let mut matched = Vec::new();
-	for (_id, pattern) in patterns {
-		if let Ok(regex) = Regex::new(&pattern)
-			&& regex.is_match(haystack)
-		{
-			matched.push(pattern);
-		}
-	}
-	Ok(matched)
+pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Result<Vec<String>> {
+	let patterns = database::highlight_get(db, author).await?;
+	Ok(patterns
+		.into_iter()
+		.filter_map(|(_id, pattern)| {
+			Regex::new(&pattern)
+				.ok()
+				.filter(|regex| regex.is_match(haystack))
+				.map(|_| pattern)
+		})
+		.collect())
 }
 
 #[poise::command(prefix_command, slash_command, rename = "match")]
 /// Tests if your highlights match a given string
 pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
 	let db = require_database!(c);
-	let x = matches(c.author().id, &haystack, Some(db)).await?;
+	let x = matches(c.author().id, &haystack, db).await?;
 
 	poise::send_reply(
 		c,
@@ -178,6 +113,7 @@ pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
 
 	Ok(())
 }
+
 #[derive(Debug)]
 pub struct RegexHolder(Vec<(UserId, Regex)>);
 impl RegexHolder {
@@ -187,10 +123,7 @@ impl RegexHolder {
 		let Some(db) = db else {
 			return Self(Vec::new());
 		};
-		let rows = match sqlx::query!("select member_id, highlight from highlights")
-			.fetch_all(db)
-			.await
-		{
+		let rows = match database::highlight_get_all(db).await {
 			Ok(rows) => rows,
 			Err(e) => {
 				warn!("Failed to load highlights from database: {e}");
@@ -198,15 +131,16 @@ impl RegexHolder {
 			}
 		};
 
-		let mut entries = Vec::new();
-		for row in rows {
-			let member_id = row.member_id;
-			let highlight = row.highlight;
-			match Regex::new(&highlight) {
-				Ok(regex) => entries.push((UserId::new(member_id.cast_unsigned()), regex)),
-				Err(e) => warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}"),
-			}
-		}
+		let entries = rows
+			.into_iter()
+			.filter_map(|(member_id, highlight)| match Regex::new(&highlight) {
+				Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
+				Err(e) => {
+					warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
+					None
+				}
+			})
+			.collect();
 
 		Self(entries)
 	}
@@ -220,8 +154,103 @@ impl RegexHolder {
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
 		self.0
 			.iter()
-			.filter(|(_, regex)| regex.is_match(haystack))
-			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
+			.filter_map(|(user_id, regex)| {
+				regex
+					.is_match(haystack)
+					.then(|| (*user_id, regex.as_str().to_string()))
+			})
 			.collect()
+	}
+}
+
+mod database {
+	use anyhow::{Context, Error};
+	use poise::serenity_prelude::UserId;
+	use sqlx::{Pool, Sqlite};
+
+	/// Adds a highlight for a user.
+	pub async fn highlight_add(
+		pool: &Pool<Sqlite>,
+		user_id: UserId,
+		regex: &str,
+	) -> Result<(), Error> {
+		let member_id = u64_to_i64(user_id.get());
+
+		sqlx::query!(
+			r#"
+			insert into highlights (member_id, highlight)
+				values (?1, ?2)
+				on conflict (member_id, highlight) do nothing
+			"#,
+			member_id,
+			regex
+		)
+		.execute(pool)
+		.await
+		.context("Failed to add highlight to database")?;
+
+		Ok(())
+	}
+
+	/// Removes a highlight by ID for a specific user.
+	pub async fn highlight_remove(
+		pool: &Pool<Sqlite>,
+		user_id: UserId,
+		id: i64,
+	) -> Result<bool, Error> {
+		let member_id = u64_to_i64(user_id.get());
+
+		let result = sqlx::query!(
+			"delete from highlights where id = ?1 and member_id = ?2",
+			id,
+			member_id
+		)
+		.execute(pool)
+		.await
+		.context("Failed to remove highlight from database")?;
+
+		Ok(result.rows_affected() > 0)
+	}
+
+	/// Gets all highlights for a specific user.
+	pub async fn highlight_get(
+		pool: &Pool<Sqlite>,
+		user_id: UserId,
+	) -> Result<Vec<(i64, String)>, Error> {
+		let member_id = u64_to_i64(user_id.get());
+
+		let rows = sqlx::query!(
+			"select id, highlight from highlights where member_id = ?1",
+			member_id
+		)
+		.fetch_all(pool)
+		.await
+		.context("Failed to fetch highlights from database")?;
+
+		let mut highlights = Vec::new();
+		for row in rows {
+			highlights.push((row.id, row.highlight));
+		}
+
+		Ok(highlights)
+	}
+
+	/// Gets all highlights from all users.
+	pub async fn highlight_get_all(pool: &Pool<Sqlite>) -> Result<Vec<(i64, String)>, Error> {
+		let rows = sqlx::query!("select member_id, highlight from highlights")
+			.fetch_all(pool)
+			.await
+			.context("Failed to fetch all highlights from database")?;
+
+		let mut highlights = Vec::new();
+		for row in rows {
+			highlights.push((row.member_id, row.highlight));
+		}
+
+		Ok(highlights)
+	}
+
+	fn u64_to_i64(value: u64) -> i64 {
+		i64::from_le_bytes(value.to_le_bytes())
 	}
 }

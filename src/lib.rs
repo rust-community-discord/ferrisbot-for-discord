@@ -76,12 +76,21 @@ pub async fn serenity(
 	let enable_database = database.is_some();
 	let command_list = build_command_list(enable_database);
 
+	if enable_database {
+		info!("Database enabled - registering database-dependent commands (tags, highlights)");
+	} else {
+		info!("Database disabled - skipping database-dependent commands");
+	}
+
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
 				let data = Data::new(&secret_store, database).await?;
 
-				debug!("Registering commands...");
+				info!(
+					"Registering {} commands...",
+					framework.options().commands.len()
+				);
 				poise::builtins::register_in_guild(
 					ctx,
 					&framework.options().commands,
@@ -235,10 +244,8 @@ fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>>
 	if enable_database {
 		command_list.extend([
 			commands::highlight::highlight(),
-			commands::highlight::remove(),
-			commands::highlight::list(),
-			commands::highlight::add(),
-			commands::highlight::mat(),
+			commands::tags::tags(),
+			commands::tags::tag(),
 		]);
 	}
 	command_list

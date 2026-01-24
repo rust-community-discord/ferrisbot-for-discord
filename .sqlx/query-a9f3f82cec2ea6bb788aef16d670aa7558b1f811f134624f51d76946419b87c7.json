@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tUPDATE tags\n\t\t\tSET restricted = 1\n\t\t\tWHERE name = ?1\n\t\t\tOR name IN (\n\t\t\t\tSELECT tag_name\n\t\t\t\tFROM tag_aliases\n\t\t\t\tWHERE alias = ?1\n\t\t\t)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a9f3f82cec2ea6bb788aef16d670aa7558b1f811f134624f51d76946419b87c7"
+}

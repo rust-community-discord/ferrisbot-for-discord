@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tinsert into highlights (member_id, highlight)\n\t\t\t\tvalues (?1, ?2)\n\t\t\t\ton conflict (member_id, highlight) do nothing\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "28c93f1fbc240a5fd743e9ed64eb452b6e6b9d63dc9bfb0b8726029fe4f22b7f"
+}

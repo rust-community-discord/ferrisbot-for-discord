@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tUPDATE tags\n\t\t\tSET content = ?2,\n\t\t\t    last_editor_user_id = ?3,\n\t\t\t    last_edit_date = CURRENT_TIMESTAMP\n\t\t\tWHERE name = ?1\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "a423bbe02614f6d1da813bc226400831ad54a4ae9296300581134045780376ce"
+}

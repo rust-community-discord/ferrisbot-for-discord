@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT times_used FROM tags WHERE name = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "times_used",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "969089c4a5958e7eaca4929648ad463532e00bca71958d43afb505945a1ac781"
+}

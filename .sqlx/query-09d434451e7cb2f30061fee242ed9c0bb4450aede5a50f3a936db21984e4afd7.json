@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tSELECT name as \"name!\", content as \"content!\", creator_user_id as \"creator_user_id!\", last_editor_user_id, creation_date as \"creation_date!\", last_edit_date, times_used as \"times_used!\", restricted as \"restricted!\"\n\t\t\tFROM tags\n\t\t\tWHERE name = ?1\n\t\t\tOR name IN (\n\t\t\t\tSELECT tag_name\n\t\t\t\tFROM tag_aliases\n\t\t\t\tWHERE alias = ?1\n\t\t\t)\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "content!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "creator_user_id!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_editor_user_id",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "creation_date!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_edit_date",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "times_used!",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "restricted!",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "09d434451e7cb2f30061fee242ed9c0bb4450aede5a50f3a936db21984e4afd7"
+}

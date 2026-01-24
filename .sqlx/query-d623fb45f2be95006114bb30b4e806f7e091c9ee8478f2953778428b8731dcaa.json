@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tUPDATE tags\n\t\t\tSET times_used = times_used + 1\n\t\t\tWHERE name = ?1\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "d623fb45f2be95006114bb30b4e806f7e091c9ee8478f2953778428b8731dcaa"
+}

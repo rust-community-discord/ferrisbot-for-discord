@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n\t\t\tINSERT INTO tags (name, content, creator_user_id)\n\t\t\tVALUES (?1, ?2, ?3)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "06df9d056e9f962e1654d4443b111f6a5d99b2b88954f7e1e249a1db02956f59"
+}

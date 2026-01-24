@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT creator_user_id, COUNT(*) as count FROM tags GROUP BY creator_user_id ORDER BY count DESC LIMIT 3",
+  "describe": {
+    "columns": [
+      {
+        "name": "creator_user_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "count",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ab9e4d20b1d986691aaf6bc5e584dea325170c888880e688d0ee60cd32201491"
+}
