@@ -27,6 +27,8 @@ struct LogConfig {
 
 #[derive(Deserialize, Debug)]
 struct DatabaseConfig {
+	#[serde(default)]
+	disabled: bool,
 	url: String,
 }
 
@@ -49,6 +51,7 @@ static DEFAULT_CONFIG: LazyLock<serde_json::Value> = LazyLock::new(|| {
 			"max_files": 10,
 		},
 		"database": {
+			"disabled": false,
 			"url": "sqlite://database/ferris.sqlite3"
 		},
 		"secrets": {}
@@ -68,17 +71,8 @@ enum LogRotation {
 fn app(config: &Config) -> Result<(), AppError> {
 	let rt = Runtime::new().context(TokioRuntimeSnafu)?;
 	rt.block_on(async {
-		let disable_database = std::env::var("FERRIS_DISABLE_DATABASE")
-			.map(|value| {
-				matches!(
-					value.to_ascii_lowercase().as_str(),
-					"1" | "true" | "yes" | "on"
-				)
-			})
-			.unwrap_or(false);
-
-		let pool = if disable_database {
-			warn!("database disabled via FERRIS_DISABLE_DATABASE");
+		let pool = if config.database.disabled {
+			warn!("database disabled via config (database.disabled = true)");
 			None
 		} else {
 			info!("connecting to SQLite database...");
@@ -175,14 +169,14 @@ fn main() {
 	info!("ferris starting...");
 
 	// Load config.
-	let config_file = "ferris.toml";
-	let config_secrets_file = "ferris.secrets.toml";
-	check_for_config_files(config_file, config_secrets_file);
+	let config_file = PathBuf::from("config/ferris.toml");
+	let config_secrets_file = PathBuf::from("config/ferris.secrets.toml");
+	check_for_config_files(&config_file, &config_secrets_file);
 	let config: Config = match Report::capture_into_result(|| {
 		Figment::new()
 			.merge(Serialized::defaults(&*DEFAULT_CONFIG))
-			.merge(Toml::file(config_file))
-			.merge(Toml::file(config_secrets_file))
+			.merge(Toml::file(&config_file))
+			.merge(Toml::file(&config_secrets_file))
 			.merge(Env::prefixed("FERRIS_").split("_"))
 			.extract()
 			.context(ConfigSnafu)
@@ -252,13 +246,13 @@ fn main() {
 	}
 }
 
-fn check_for_config_files(main: &str, secrets: &str) {
+fn check_for_config_files(main: &PathBuf, secrets: &PathBuf) {
 	if !fs::exists(main).is_ok_and(|x| x) {
-		warn!(file = main, "config file missing");
+		warn!(file = %main.display(), "config file missing");
 	}
 
 	if !fs::exists(secrets).is_ok_and(|x| x) {
-		warn!(file = secrets, "secrets config file missing");
+		warn!(file = %secrets.display(), "secrets config file missing");
 	}
 }
 

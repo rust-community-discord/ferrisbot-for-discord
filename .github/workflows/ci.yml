@@ -16,7 +16,6 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  FERRIS_DISABLE_DATABASE: "1"
 
 jobs:
   fmt:

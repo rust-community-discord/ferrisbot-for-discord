@@ -5,7 +5,6 @@ services:
     build:
       context: '.'
       dockerfile: 'Containerfile'
-    env_file: '.env'
     restart: 'unless-stopped'
     volumes:
     - type: bind
@@ -14,3 +13,6 @@ services:
     - type: bind
       source: ./logs/
       target: /usr/src/app/logs/
+    - type: bind
+      source: ./config/
+      target: /usr/src/app/config/

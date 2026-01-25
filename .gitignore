@@ -17,18 +17,20 @@ Cargo.lock
 .env
 .env.local
 .*/
-!.sqlx/
-ferris.secrets.toml
-ferris.toml
-database/
-*.sqlite3
-*.db
-logs/
-logs-bkp/
 
 # Allow the .github folder
 !.github/
-/target
 
 # Log folder
 logs/
+logs-bkp/
+
+# Allow the SQLX folder
+!.sqlx/
+*.sqlite3
+*.db
+
+# Database and config files
+ferris.secrets.toml
+ferris.toml
+database/

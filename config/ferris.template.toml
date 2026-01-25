@@ -1,0 +1,11 @@
+[database]
+disabled = false
+url = "sqlite://database/ferris.sqlite3"
+
+[log]
+filter = ""
+rotation = "daily"
+dir = "logs"
+prefix = "ferris"
+suffix = "log"
+max_files = 10
