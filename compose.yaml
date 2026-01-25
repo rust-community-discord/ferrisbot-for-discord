@@ -2,13 +2,15 @@ version: '3'
 
 services:
   ferris:
-    build: '.'
+    build:
+      context: '.'
+      dockerfile: 'Containerfile'
     env_file: '.env'
     restart: 'unless-stopped'
     volumes:
     - type: bind
-      source: ./database/ferris.sqlite3
-      target: /usr/src/app/database/ferris.sqlite3
+      source: ./database/
+      target: /usr/src/app/database/
     - type: bind
-      source: ./logs
-      target: /usr/src/app/logs
+      source: ./logs/
+      target: /usr/src/app/logs/
