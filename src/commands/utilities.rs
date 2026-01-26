@@ -402,8 +402,13 @@ pub async fn edit(
 pub async fn purge(
 	ctx: Context<'_>,
 	#[description = "User to delete messages from"] user: Option<serenity::User>,
-	#[description = "Amount of messages to delete"] amount: u8,
+	#[description = "Amount of messages to delete (<= 100)"] amount: u8,
 ) -> Result<(), Error> {
+	if amount > 100 {
+		ctx.say("Amount is capped to 100 messages due to a Discord limitation. Please try again.")
+			.await?;
+		return Ok(());
+	}
 	let channel_id = ctx.channel_id();
 	let fetch_amount = if user.is_some() { 100 } else { amount };
 	let builder = GetMessages::new().limit(fetch_amount);
