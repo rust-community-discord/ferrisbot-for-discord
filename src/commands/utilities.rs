@@ -426,7 +426,12 @@ pub async fn purge(
 
 	ctx.defer_ephemeral().await?;
 	messages_to_delete.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-	for message in messages_to_delete.iter().take(amount as usize) {
+	let messages_to_delete = messages_to_delete.iter().take(amount as usize);
+	if amount as usize > messages_to_delete.len() {
+		ctx.say("Not enough messages to delete, deleting as many as possible.")
+			.await?;
+	}
+	for message in messages_to_delete {
 		debug!(message_id = ?message.id, "Deleting message");
 		message.delete(ctx.http()).await?;
 	}
