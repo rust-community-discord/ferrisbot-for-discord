@@ -7,7 +7,6 @@ use poise::serenity_prelude::{
 };
 use rand::Rng;
 use std::time::Duration;
-use tracing::debug;
 
 use crate::types::Context;
 
@@ -431,11 +430,9 @@ pub async fn purge(
 		ctx.say("Not enough messages to delete, deleting as many as possible.")
 			.await?;
 	}
-	for message in messages_to_delete {
-		debug!(message_id = ?message.id, "Deleting message");
-		message.delete(ctx.http()).await?;
-	}
-
+	channel_id
+		.delete_messages(ctx.http(), messages_to_delete)
+		.await?;
 	let user_str = match user {
 		Some(ref user) => format!("by {}", user.mention()),
 		None => String::new(),
