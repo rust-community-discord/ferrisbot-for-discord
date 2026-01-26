@@ -399,6 +399,19 @@ pub async fn purge(
 	#[description = "User to delete messages from"] user: Option<serenity::User>,
 	#[description = "Amount of messages to delete"] amount: u8,
 ) -> Result<(), Error> {
+	if let Some(member) = ctx.author_member().await {
+		if let Some(permissions) = member.permissions
+			&& !permissions.manage_messages()
+		{
+			ctx.say("You do not have permission to use this command.")
+				.await?;
+			return Ok(());
+		}
+	} else {
+		ctx.say("Could not retrieve your permissions.").await?;
+		return Ok(());
+	}
+
 	let channel_id = ctx.channel_id();
 	let fetch_amount = if user.is_some() { 100 } else { amount };
 	let builder = GetMessages::new().limit(fetch_amount);
