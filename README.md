@@ -37,7 +37,7 @@ We use sqlx with SQLite. Point `DATABASE_URL` at the database file you want to u
 2. Apply migrations: `cargo sqlx database migrate`
 3. Generate offline metadata: `cargo sqlx prepare`
 
-If you need to skip the database entirely, set `database.disabled = true` in `ferris.toml` (or override with `FERRIS_DATABASE_DISABLED=1`).
+If you need to skip the database entirely, set `database.disabled = true` in `ferris.toml` (or override with `FERRIS_DATABASE_DISABLED=true`).
 
 ## Running locally (without containers)
 
