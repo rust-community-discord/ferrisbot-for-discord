@@ -12,21 +12,62 @@ data:
           url: s3://ferrisbot-litestream/ferris.sqlite3
           endpoint: https://nbg1.your-objectstorage.com
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ferrisbot
+  namespace: ferrisbot
+data:
+  ferris.toml: |
+    [database]
+    disabled = false
+    url = "sqlite://database/ferris.sqlite3"
+
+    [log]
+    filter = ""
+    rotation = "daily"
+    dir = "logs"
+    prefix = "ferris"
+    suffix = "log"
+    max_files = 10
+  ferris.secrets.toml: |
+    [secrets]
+    # ID of the Discord guild that the application will run on
+    DISCORD_GUILD = ""
+
+    # ID of your Discord bot application
+    APPLICATION_ID = ""
+
+    # ID of the Moderator role. Potentially used someday for `?cleanup` command
+    MOD_ROLE_ID = ""
+
+    # ID of the Rustacean role. Used for `?rustify` command
+    RUSTACEAN_ROLE_ID = ""
+
+    # ID of the channel to send modmail to
+    MODMAIL_CHANNEL_ID = ""
+
+    # ID of the channel for audit logging (edit command logs, etc.)
+    MODLOG_CHANNEL_ID = ""
+
+    # The duration to wait before refreshing the godbolt targets list
+    GODBOLT_UPDATE_DURATION = "1"
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-app
+  name: ferrisbot
   namespace: ferrisbot
 spec:
   selector:
     matchLabels:
-      app: test-app
-  serviceName: test-app
+      app: ferrisbot
+  serviceName: ferrisbot
   replicas: 1
   template:
     metadata:
       labels:
-        app: test-app
+        app: ferrisbot
     spec:
       initContainers:
         - name: init-litestream
@@ -56,17 +97,19 @@ spec:
                   name: backup-store
                   key: secret-key
       containers:
-        - name: pause
-          image: registry.k8s.io/pause
+        - name: ferrisbot
+          image: ghcr.io/rust-community-discord/ferrisbot-for-discord:caf04f8
           volumeMounts:
             - name: ferrisbot-sqlite
               mountPath: /database
-        - name: sqlite
-          image: nouchka/sqlite3
-          command: ["tail", "-f", "/dev/null"] # keep container running
-          volumeMounts:
-            - name: ferrisbot-sqlite
-              mountPath: /database
+            - name: ferrisbot-config
+              mountPath: /config
+          env:
+            - name: FERRIS_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ferrisbot
+                  key: discord-token
         - name: litestream
           image: litestream/litestream:0.5.6
           args: ["replicate"]
@@ -94,6 +137,9 @@ spec:
         - name: litestream-config
           configMap:
             name: litestream
+        - name: ferrisbot-config
+          configMap:
+            name: ferrisbot
   volumeClaimTemplates:
     - metadata:
         name: ferrisbot-sqlite

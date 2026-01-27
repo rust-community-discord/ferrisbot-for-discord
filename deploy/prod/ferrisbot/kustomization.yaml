@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
 - namespace.yaml
 - backup.secrets.yaml
-- litestream.yaml
+- ferrisbot.yaml
