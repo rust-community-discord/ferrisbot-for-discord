@@ -1,7 +1,10 @@
 use anyhow::{Error, anyhow};
+use itertools::Itertools;
 use poise::{
     CreateReply,
-    serenity_prelude::{self as serenity, ChannelType, Color, CreateEmbed, EditThread, Timestamp},
+    serenity_prelude::{
+        self as serenity, ChannelType, Color, CreateEmbed, CreateEmbedFooter, EditThread, Timestamp,
+    },
 };
 use rand::Rng;
 use std::iter;
@@ -440,5 +443,54 @@ pub async fn server(ctx: Context<'_>) -> Result<(), Error> {
     };
     ctx.send(reply).await?;
 
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    prefix_command,
+    category = "Utilities",
+    on_error = "crate::helpers::acknowledge_fail"
+)]
+pub async fn user(ctx: Context<'_>, user: Option<serenity::User>) -> Result<(), Error> {
+    let user = user.unwrap_or_else(|| ctx.author().clone());
+    let uid = user.id.get();
+    let name = user.display_name();
+    let handle = &user.name;
+    let created_at = user.created_at();
+    let guild = ctx
+        .guild()
+        .ok_or(anyhow!("Failed to get guild information"))?
+        .clone();
+    let member = guild.member(ctx.http(), uid).await?;
+    let joined_at = member.joined_at.unwrap_or_default();
+    let roles = member.roles(ctx.cache()).unwrap_or_default();
+    let status = guild.presences.get(&user.id);
+    let status = match status {
+        Some(status) => status.status,
+        None => serenity::OnlineStatus::Offline,
+    };
+
+    let thumbnail = user.avatar_url().unwrap_or_default();
+    let fields = [
+        ("Created At", format!("{created_at}"), true),
+        ("Joined At", format!("{joined_at}"), true),
+        ("Status", status.name().to_string(), true),
+    ];
+    let embed = CreateEmbed::new()
+        .title(format!("{name} ({handle})"))
+        .thumbnail(thumbnail)
+        .color(Color::ORANGE)
+        .description(format!("User ID: {uid}"))
+        .footer(CreateEmbedFooter::new(
+            roles.iter().map(|r| r.name.clone()).join(" | "),
+        ))
+        .fields(fields);
+    let reply = CreateReply {
+        embeds: vec![embed],
+
+        ..Default::default()
+    };
+    ctx.send(reply).await?;
     Ok(())
 }
