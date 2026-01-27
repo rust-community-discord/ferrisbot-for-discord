@@ -401,6 +401,7 @@ pub async fn edit(
     category = "Utilities",
     on_error = "crate::helpers::acknowledge_fail"
 )]
+/// Shows information about the server
 pub async fn server(ctx: Context<'_>) -> Result<(), Error> {
     let guild = ctx
         .guild()
@@ -452,7 +453,11 @@ pub async fn server(ctx: Context<'_>) -> Result<(), Error> {
     category = "Utilities",
     on_error = "crate::helpers::acknowledge_fail"
 )]
-pub async fn user(ctx: Context<'_>, user: Option<serenity::User>) -> Result<(), Error> {
+/// Shows information about a user
+pub async fn user(
+    ctx: Context<'_>,
+    #[description = "User to get information about"] user: Option<serenity::User>,
+) -> Result<(), Error> {
     let user = user.unwrap_or_else(|| ctx.author().clone());
     let uid = user.id.get();
     let name = user.display_name();
