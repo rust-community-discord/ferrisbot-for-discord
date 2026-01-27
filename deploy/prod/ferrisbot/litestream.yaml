@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litestream
+  namespace: ferrisbot
+data:
+  litestream.yml: |
+    dbs:
+      - path: /database/ferris.sqlite3
+        replica:
+          url: s3://ferrisbot-litestream/ferris.sqlite3
+          endpoint: https://nbg1.your-objectstorage.com
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-app
+  namespace: ferrisbot
+spec:
+  selector:
+    matchLabels:
+      app: test-app
+  serviceName: test-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      initContainers:
+        - name: init-litestream
+          image: litestream/litestream:0.5.6
+          args:
+            [
+              "restore",
+              "-if-db-not-exists",
+              "-if-replica-exists",
+              "/database/ferris.sqlite3",
+            ]
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+            - name: litestream-config
+              mountPath: /etc/litestream.yml
+              subPath: litestream.yml
+          env:
+            - name: LITESTREAM_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: access-key
+            - name: LITESTREAM_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: secret-key
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+        - name: sqlite
+          image: nouchka/sqlite3
+          command: ["tail", "-f", "/dev/null"] # keep container running
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+        - name: litestream
+          image: litestream/litestream:0.5.6
+          args: ["replicate"]
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+            - name: litestream-config
+              mountPath: /etc/litestream.yml
+              subPath: litestream.yml
+          env:
+            - name: LITESTREAM_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: access-key
+            - name: LITESTREAM_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: secret-key
+          ports:
+            - name: metrics
+              containerPort: 9090
+      volumes:
+        - name: litestream-config
+          configMap:
+            name: litestream
+  volumeClaimTemplates:
+    - metadata:
+        name: ferrisbot-sqlite
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: hcloud-volumes
