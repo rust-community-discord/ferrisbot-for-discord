@@ -24,6 +24,7 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 /// Adds a highlight. When a highlight is matched, you will receive a DM.
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
+	c.defer().await?;
 
 	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
 		c.say(format!("```\n{e}```")).await?;
