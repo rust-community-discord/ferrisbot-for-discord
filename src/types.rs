@@ -16,6 +16,7 @@ pub struct Data {
 	pub discord_guild_id: serenity::GuildId,
 	pub application_id: serenity::UserId,
 	pub mod_role_id: serenity::RoleId,
+	pub mod_consultant_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
 	pub modmail_channel_id: serenity::ChannelId,
 	pub modlog_channel_id: serenity::ChannelId,
@@ -37,6 +38,9 @@ impl Data {
 			discord_guild_id: secret_store.get_discord_id("DISCORD_GUILD")?.into(),
 			application_id: secret_store.get_discord_id("APPLICATION_ID")?.into(),
 			mod_role_id: secret_store.get_discord_id("MOD_ROLE_ID")?.into(),
+			mod_consultant_role_id: secret_store
+				.get_discord_id("MOD_CONSULTANT_ROLE_ID")?
+				.into(),
 			rustacean_role_id: secret_store.get_discord_id("RUSTACEAN_ROLE_ID")?.into(),
 			modmail_channel_id: secret_store.get_discord_id("MODMAIL_CHANNEL_ID")?.into(),
 			modlog_channel_id: secret_store.get_discord_id("MODLOG_CHANNEL_ID")?.into(),
