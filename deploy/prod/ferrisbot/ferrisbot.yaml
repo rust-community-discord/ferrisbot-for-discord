@@ -121,6 +121,8 @@ spec:
           ports:
             - name: metrics
               containerPort: 9090
+      imagePullSecrets:
+      - name: ghcr-secret
       volumes:
         - name: litestream-config
           configMap:
