@@ -33,24 +33,12 @@ data:
   ferris.secrets.toml: |
     [secrets]
     # ID of the Discord guild that the application will run on
-    DISCORD_GUILD = ""
-
-    # ID of your Discord bot application
-    APPLICATION_ID = ""
-
-    # ID of the Moderator role. Potentially used someday for `?cleanup` command
-    MOD_ROLE_ID = ""
-
-    # ID of the Rustacean role. Used for `?rustify` command
-    RUSTACEAN_ROLE_ID = ""
-
-    # ID of the channel to send modmail to
-    MODMAIL_CHANNEL_ID = ""
-
-    # ID of the channel for audit logging (edit command logs, etc.)
-    MODLOG_CHANNEL_ID = ""
-
-    # The duration to wait before refreshing the godbolt targets list
+    DISCORD_GUILD = "273534239310479360"
+    APPLICATION_ID = "275357149477994498"
+    MOD_ROLE_ID = "631915156854538260"
+    RUSTACEAN_ROLE_ID = "319953207193501696"
+    MODMAIL_CHANNEL_ID = "935643214818443265"
+    MODLOG_CHANNEL_ID = "935643214818443265"
     GODBOLT_UPDATE_DURATION = "1"
 ---
 apiVersion: apps/v1
