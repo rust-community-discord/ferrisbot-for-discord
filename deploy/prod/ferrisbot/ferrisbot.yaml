@@ -21,7 +21,7 @@ data:
   ferris.toml: |
     [database]
     disabled = false
-    url = "sqlite://database/ferris.sqlite3"
+    url = "sqlite:///database/ferris.sqlite3"
 
     [log]
     filter = ""
@@ -86,8 +86,17 @@ spec:
                   name: backup-store
                   key: secret-key
       containers:
+        - name: sqlite
+          image: nouchka/sqlite3
+          command:
+            - "tail"
+            - "-f"
+            - "/dev/null"
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
         - name: ferrisbot
-          image: ghcr.io/rust-community-discord/ferrisbot-for-discord:caf04f8
+          image: ghcr.io/rust-community-discord/ferrisbot-for-discord:bc79541
           volumeMounts:
             - name: ferrisbot-sqlite
               mountPath: /database
