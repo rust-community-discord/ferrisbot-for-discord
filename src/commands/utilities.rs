@@ -2,7 +2,9 @@ use std::iter;
 use std::sync::LazyLock;
 
 use anyhow::{Error, anyhow};
-use poise::serenity_prelude::{self as serenity, ChannelType, EditThread, Timestamp};
+use poise::serenity_prelude::{
+	self as serenity, ChannelType, EditThread, GetMessages, Mentionable, Timestamp,
+};
 use rand::Rng;
 use std::time::Duration;
 
@@ -386,5 +388,52 @@ pub async fn edit(
 	)
 	.await?;
 
+	Ok(())
+}
+
+/// Deletes messages from a channel, optionally by a user
+#[poise::command(
+	ephemeral,
+	slash_command,
+	prefix_command,
+	category = "Utilities",
+	required_permissions = "MANAGE_MESSAGES"
+)]
+pub async fn purge(
+	ctx: Context<'_>,
+	#[description = "User to delete messages from"] user: Option<serenity::User>,
+	#[max = 100]
+	#[description = "Amount of messages to delete (<= 100)"]
+	amount: u8,
+) -> Result<(), Error> {
+	let channel_id = ctx.channel_id();
+	let fetch_amount = if user.is_some() { 100 } else { amount };
+	let builder = GetMessages::new().limit(fetch_amount);
+	let messages = channel_id.messages(ctx.http(), builder).await?;
+	let mut messages_to_delete = match user {
+		Some(ref user) => messages
+			.into_iter()
+			.filter(|m| m.author.id == user.id)
+			.collect(),
+		None => messages,
+	};
+
+	ctx.defer_ephemeral().await?;
+	messages_to_delete.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+	let messages_to_delete = messages_to_delete.iter().take(amount as usize);
+	if amount as usize > messages_to_delete.len() {
+		ctx.say("Not enough messages to delete, deleting as many as possible.")
+			.await?;
+	}
+	channel_id
+		.delete_messages(ctx.http(), messages_to_delete)
+		.await?;
+	let user_str = match user {
+		Some(ref user) => format!("by {}", user.mention()),
+		None => String::new(),
+	};
+
+	ctx.say(format!("Deleted {amount} messages {user_str}"))
+		.await?;
 	Ok(())
 }
