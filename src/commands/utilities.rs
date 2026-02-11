@@ -1,10 +1,16 @@
+use anyhow::{Error, anyhow};
+use itertools::Itertools;
+use poise::{
+	CreateReply,
+	serenity_prelude::{
+		self as serenity, ChannelType, Color, CreateEmbed, CreateEmbedFooter, EditThread, Timestamp,
+	},
+};
+use rand::Rng;
 use std::iter;
 use std::sync::LazyLock;
-
-use anyhow::{Error, anyhow};
-use poise::serenity_prelude::{self as serenity, ChannelType, EditThread, Timestamp};
-use rand::Rng;
 use std::time::Duration;
+use tracing::info;
 
 use crate::types::Context;
 
@@ -386,5 +392,110 @@ pub async fn edit(
 	)
 	.await?;
 
+	Ok(())
+}
+
+#[poise::command(
+	slash_command,
+	prefix_command,
+	category = "Utilities",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+/// Shows information about the server
+pub async fn server(ctx: Context<'_>) -> Result<(), Error> {
+	let guild = ctx
+		.guild()
+		.ok_or(anyhow!("Failed to get guild information"))?
+		.clone();
+	let member_count = guild.member_count;
+	let online_member_count = guild
+		.members_with_status(serenity::OnlineStatus::Online)
+		.count();
+	let boost_count = guild.premium_subscription_count.unwrap_or_default();
+	let text_channel_count = guild
+		.channels
+		.iter()
+		.filter(|f| f.1.kind == ChannelType::Text)
+		.count();
+	let voice_channel_count = guild
+		.channels
+		.iter()
+		.filter(|f| f.1.kind == ChannelType::Voice)
+		.count();
+
+	info!("Got guild icon: {:?}", guild.icon_url());
+	let embed = CreateEmbed::new()
+        .title(&guild.name)
+        .thumbnail(guild.icon_url().unwrap_or_default())
+        .color(Color::ORANGE)
+        .fields([
+            ("Members", format!("{online_member_count}/{member_count}"), true),
+            ("Boost Count", format!("{boost_count}"), true),
+            ("Text Channels", format!("{text_channel_count}"), true),
+            ("Voice Channels", format!("{voice_channel_count}"), true),
+        ])
+        .description(
+            "The Rust Programming Language Community Server is all about learning and sharing Rust knowledge, and helping others.",
+        );
+	let reply = CreateReply {
+		embeds: vec![embed],
+
+		..Default::default()
+	};
+	ctx.send(reply).await?;
+
+	Ok(())
+}
+
+#[poise::command(
+	slash_command,
+	prefix_command,
+	category = "Utilities",
+	on_error = "crate::helpers::acknowledge_fail"
+)]
+/// Shows information about a user
+pub async fn user(
+	ctx: Context<'_>,
+	#[description = "User to get information about"] user: Option<serenity::User>,
+) -> Result<(), Error> {
+	let user = user.unwrap_or_else(|| ctx.author().clone());
+	let uid = user.id.get();
+	let name = user.display_name();
+	let handle = &user.name;
+	let created_at = user.created_at();
+	let guild = ctx
+		.guild()
+		.ok_or(anyhow!("Failed to get guild information"))?
+		.clone();
+	let member = guild.member(ctx.http(), uid).await?;
+	let joined_at = member.joined_at.unwrap_or_default();
+	let roles = member.roles(ctx.cache()).unwrap_or_default();
+	let status = guild.presences.get(&user.id);
+	let status = match status {
+		Some(status) => status.status,
+		None => serenity::OnlineStatus::Offline,
+	};
+
+	let thumbnail = user.avatar_url().unwrap_or_default();
+	let fields = [
+		("Created At", format!("{created_at}"), true),
+		("Joined At", format!("{joined_at}"), true),
+		("Status", status.name().to_string(), true),
+	];
+	let embed = CreateEmbed::new()
+		.title(format!("{name} ({handle})"))
+		.thumbnail(thumbnail)
+		.color(Color::ORANGE)
+		.description(format!("User ID: {uid}"))
+		.footer(CreateEmbedFooter::new(
+			roles.iter().map(|r| r.name.clone()).join(" | "),
+		))
+		.fields(fields);
+	let reply = CreateReply {
+		embeds: vec![embed],
+
+		..Default::default()
+	};
+	ctx.send(reply).await?;
 	Ok(())
 }

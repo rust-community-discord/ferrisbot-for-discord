@@ -195,6 +195,7 @@ pub async fn serenity(
 
 	// Don't include presence updates, as they consume a lot of memory and CPU.
 	let intents = serenity::GatewayIntents::non_privileged()
+		| serenity::GatewayIntents::GUILD_PRESENCES
 		| serenity::GatewayIntents::GUILD_MEMBERS
 		| serenity::GatewayIntents::MESSAGE_CONTENT;
 
@@ -217,6 +218,8 @@ fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>>
 		commands::godbolt::targets(),
 		commands::utilities::go(),
 		commands::utilities::source(),
+		commands::utilities::server(),
+		commands::utilities::user(),
 		commands::utilities::help(),
 		commands::utilities::register(),
 		commands::utilities::uptime(),
