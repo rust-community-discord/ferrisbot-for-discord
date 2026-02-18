@@ -6,7 +6,7 @@ use poise::{
 	CreateReply,
 	serenity_prelude::{CreateEmbed, UserId},
 };
-use regex::{Regex, RegexBuilder};
+use regex::{Regex, RegexBuilder, RegexSet};
 use sqlx::{Pool, Sqlite};
 
 #[allow(clippy::unused_async)]
@@ -115,35 +115,38 @@ pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
 	Ok(())
 }
 
-#[derive(Debug)]
-pub struct RegexHolder(Vec<(UserId, Regex)>);
+#[derive(Debug, Default)]
+pub struct RegexHolder(Vec<(UserId, String)>, RegexSet);
+
 impl RegexHolder {
 	pub async fn new(db: Option<&Pool<Sqlite>>) -> Self {
 		use tracing::warn;
 
 		let Some(db) = db else {
-			return Self(Vec::new());
+			return Self::default();
 		};
+
 		let rows = match database::highlight_get_all(db).await {
 			Ok(rows) => rows,
 			Err(e) => {
 				warn!("Failed to load highlights from database: {e}");
-				return Self(Vec::new());
+				return Self::default();
 			}
 		};
 
 		let entries = rows
 			.into_iter()
 			.filter_map(|(member_id, highlight)| match Regex::new(&highlight) {
-				Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
+				Ok(_) => Some((UserId::new(member_id.cast_unsigned()), highlight)),
 				Err(e) => {
 					warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
 					None
 				}
 			})
-			.collect();
+			.collect::<Vec<_>>();
+		let set = RegexSet::new(entries.iter().map(|(_, highlight)| highlight)).unwrap();
 
-		Self(entries)
+		Self(entries, set)
 	}
 
 	async fn update(data: &crate::types::Data) {
@@ -153,10 +156,11 @@ impl RegexHolder {
 
 	#[must_use]
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
-		self.0
-			.iter()
-			.filter(|&(_user_id, regex)| regex.is_match(haystack))
-			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
+		let Self(highlights, set) = self;
+
+		set.matches(haystack)
+			.into_iter()
+			.map(|index| highlights[index].clone())
 			.collect()
 	}
 }
