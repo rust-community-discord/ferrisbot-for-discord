@@ -151,7 +151,7 @@ impl RegexHolder {
 
 	async fn update(data: &crate::types::Data) {
 		let new = Self::new(data.database.as_ref()).await;
-		*data.highlights.write().await = new;
+		*data.highlights.write().unwrap() = new;
 	}
 
 	#[must_use]

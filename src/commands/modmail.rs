@@ -94,7 +94,7 @@ pub async fn load_or_create_modmail_message(
 	data: &Data,
 ) -> Result<(), Error> {
 	// Do nothing if message already exists in cache
-	if data.modmail_message.read().await.clone().is_some() {
+	if data.modmail_message.read().unwrap().clone().is_some() {
 		debug!("Modmail message already exists on data cache.");
 		return Ok(());
 	}
@@ -144,15 +144,15 @@ The modmail will materialize itself as a private thread under this channel with 
 	};
 
 	// Cache the message in the Data struct
-	store_message(data, message).await;
+	store_message(data, message);
 
 	Ok(())
 }
 
 /// It's important to keep this in a function because we're dealing with lifetimes and guard drops.
-async fn store_message(data: &Data, message: serenity::Message) {
+fn store_message(data: &Data, message: serenity::Message) {
 	info!("Storing modlog message on cache.");
-	let mut rwguard = data.modmail_message.write().await;
+	let mut rwguard = data.modmail_message.write().unwrap();
 	rwguard.get_or_insert(message);
 }
 
@@ -167,7 +167,7 @@ pub async fn create_modmail_thread(
 	let modmail_message = data
 		.modmail_message
 		.read()
-		.await
+		.unwrap()
 		.clone()
 		.ok_or(anyhow!("Modmail message somehow ceased to exist"))?;
 

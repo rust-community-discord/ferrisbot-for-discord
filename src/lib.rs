@@ -302,8 +302,7 @@ async fn event_handler(
 			if let Some(gid) = new_message.guild_id
 				&& !new_message.author.bot
 			{
-				let hl = data.highlights.read().await;
-				let matches = hl.find(&new_message.content);
+				let matches = data.highlights.read().unwrap().find(&new_message.content);
 				let message_link = new_message.link();
 				let message_link = &*message_link;
 				let mut stream = futures::stream::iter(matches)
