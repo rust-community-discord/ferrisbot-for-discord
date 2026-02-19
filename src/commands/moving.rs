@@ -834,7 +834,8 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 			} else {
 				true
 			}
-		});
+		})
+		.collect::<Vec<_>>();
 
 	let mut relayed_messages = Vec::new();
 	let mut original_users = HashMap::new();
@@ -981,9 +982,13 @@ async fn move_messages(ctx: Context<'_>, start_msg: Message) -> Result<()> {
 	});
 
 	// Delete the original messages.
-	for msg in filtered_messages {
-		if let Err(e) = msg.delete(&ctx).await {
-			tracing::warn!(err = %e, "failed to delete original message");
+	for msg_chunk in filtered_messages.chunks(100) {
+		if let Err(e) = ctx
+			.channel_id()
+			.delete_messages(&ctx, msg_chunk.iter().map(|m| m.id))
+			.await
+		{
+			tracing::warn!(err = %e, "failed to delete original messages");
 			return Err(e.into());
 		}
 	}
