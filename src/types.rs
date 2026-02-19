@@ -1,13 +1,10 @@
-use std::{
-	collections::HashSet,
-	sync::{Arc, Mutex as StdMutex},
-};
-
+use crate::{SecretStore, commands};
 use anyhow::{Error, Result};
 use poise::serenity_prelude as serenity;
-use tokio::sync::RwLock;
-
-use crate::{SecretStore, commands};
+use std::{
+	collections::HashSet,
+	sync::{Mutex, OnceLock, RwLock},
+};
 
 #[derive(Debug)]
 pub struct Data {
@@ -19,11 +16,11 @@ pub struct Data {
 	pub rustacean_role_id: serenity::RoleId,
 	pub modmail_channel_id: serenity::ChannelId,
 	pub modlog_channel_id: serenity::ChannelId,
-	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
+	pub modmail_message: OnceLock<serenity::Message>,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
-	pub godbolt_metadata: StdMutex<commands::godbolt::GodboltMetadata>,
-	pub move_channel_locks: StdMutex<HashSet<serenity::ChannelId>>,
+	pub godbolt_metadata: Mutex<commands::godbolt::GodboltMetadata>,
+	pub move_channel_locks: Mutex<HashSet<serenity::ChannelId>>,
 }
 
 impl Data {
@@ -40,11 +37,11 @@ impl Data {
 			rustacean_role_id: secret_store.get_discord_id("RUSTACEAN_ROLE_ID")?.into(),
 			modmail_channel_id: secret_store.get_discord_id("MODMAIL_CHANNEL_ID")?.into(),
 			modlog_channel_id: secret_store.get_discord_id("MODLOG_CHANNEL_ID")?.into(),
-			modmail_message: Arc::default(),
+			modmail_message: OnceLock::new(),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
-			godbolt_metadata: StdMutex::new(commands::godbolt::GodboltMetadata::default()),
-			move_channel_locks: StdMutex::new(HashSet::new()),
+			godbolt_metadata: Mutex::default(),
+			move_channel_locks: Mutex::default(),
 		})
 	}
 }
