@@ -222,6 +222,7 @@ fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>>
 		commands::utilities::uptime(),
 		commands::utilities::conradluget(),
 		commands::utilities::cleanup(),
+		commands::utilities::delete_user_messages_in_channel(),
 		commands::utilities::ban(),
 		commands::utilities::selftimeout(),
 		commands::utilities::solved(),

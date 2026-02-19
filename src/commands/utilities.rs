@@ -1,8 +1,11 @@
-use std::iter;
 use std::sync::LazyLock;
+use std::{future::ready, iter};
 
 use anyhow::{Error, anyhow};
-use poise::serenity_prelude::{self as serenity, ChannelType, EditThread, Timestamp};
+use futures::{StreamExt, TryStreamExt};
+use poise::serenity_prelude::{
+	self as serenity, ChannelType, EditThread, Mention, Message, Timestamp,
+};
 use rand::Rng;
 use std::time::Duration;
 
@@ -188,6 +191,75 @@ pub async fn cleanup(
 		.await?;
 
 	crate::helpers::acknowledge_success(ctx, "rustOk", '👌').await
+}
+
+/// Delete an user's messages after-and-including the selected one, up to 100.
+#[poise::command(
+	context_menu_command = "Delete user's messages since this one",
+	guild_only,
+	ephemeral,
+	default_member_permissions = "MANAGE_MESSAGES",
+	required_permissions = "MANAGE_MESSAGES",
+	required_bot_permissions = "MANAGE_MESSAGES"
+)]
+pub async fn delete_user_messages_in_channel(ctx: Context<'_>, msg: Message) -> Result<(), Error> {
+	ctx.defer_ephemeral().await?;
+
+	let target_user = msg.author.id;
+	let target_id = msg.id;
+
+	let messages_to_delete = msg.channel_id.messages_iter(&ctx)
+		// Don't go too far if the messages are very sparse.
+		.take(1000)
+		.try_filter(|msg| ready(msg.author.id == target_user))
+		// Only look at messages after or matching the selected one.
+		.try_take_while(|msg| ready(Ok(msg.id >= target_id)))
+		// Only delete 100 messages at most.
+		.take(100)
+		.try_collect::<Vec<_>>().await?;
+
+	let count = messages_to_delete.len();
+
+	// No need to process in several batches as max size is 100.
+	msg.channel_id
+		.delete_messages(&ctx, messages_to_delete.iter().map(|m| m.id))
+		.await?;
+
+	ctx.send(
+		poise::CreateReply::default()
+			.content(format!(
+				"✅ {count} messages from {} were deleted!",
+				Mention::from(target_user)
+			))
+			.ephemeral(true),
+	)
+	.await?;
+
+	// Log the deleted messages.
+	for message in &messages_to_delete {
+		if let Err(e) = crate::helpers::send_audit_log(
+			ctx,
+			"Delete User Messages in Channel",
+			ctx.author().id,
+			&format!(
+				"Author: {}\n{}",
+				Mention::from(target_user),
+				&message.content
+			),
+		)
+		.await
+		{
+			ctx.send(
+				poise::CreateReply::default()
+					.content(format!("❌ Failed to log audit information: {e}"))
+					.ephemeral(true),
+			)
+			.await?;
+			return Ok(());
+		}
+	}
+
+	Ok(())
 }
 
 /// Bans another person
