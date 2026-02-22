@@ -193,8 +193,9 @@ pub async fn create_modmail_thread(
 		.await?;
 
 	let thread_message_content = format!(
-		"Hey {}, {} needs help with the following:\n> {}",
+		"Hey {} (cc: {}), {} needs help with the following:\n> {}",
 		data.mod_role_id.mention(),
+		data.mod_consultant_role_id.mention(),
 		user_id.mention(),
 		user_message.into()
 	);
@@ -207,7 +208,7 @@ pub async fn create_modmail_thread(
 				.allowed_mentions(
 					serenity::CreateAllowedMentions::new()
 						.users([user_id])
-						.roles([data.mod_role_id]),
+						.roles([data.mod_role_id, data.mod_consultant_role_id]),
 				),
 		)
 		.await?;
