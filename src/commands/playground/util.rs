@@ -227,7 +227,10 @@ pub fn maybe_wrapped(
 	use syn::{parse::Parse, *};
 
 	// We use syn to check whether there is a main function.
-	struct Inline(bool);
+	enum Inline {
+		HasMain,
+		NoMain,
+	}
 	impl Parse for Inline {
 		fn parse(input: parse::ParseStream<'_>) -> Result<Self> {
 			Attribute::parse_inner(input)?;
@@ -237,15 +240,15 @@ pub fn maybe_wrapped(
 					&& sig.ident == "main"
 					&& sig.inputs.is_empty()
 				{
-					return Ok(Self(false));
+					return Ok(Self::HasMain);
 				}
 			}
-			Ok(Self(true))
+			Ok(Self::NoMain)
 		}
 	}
 
 	// parse errors still wrap
-	if let Ok(Inline(false)) = parse_str::<Inline>(code) {
+	if let Ok(Inline::HasMain) = parse_str(code) {
 		return Cow::Borrowed(code);
 	}
 
