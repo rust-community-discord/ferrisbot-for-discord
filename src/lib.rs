@@ -310,28 +310,32 @@ async fn event_handler(
 					.map(|(person_id, matcher)| async move {
 						if let Ok(member) = gid.member(ctx, person_id).await
 							&& let Ok(p) = gid.to_partial_guild(ctx).await
-							&& let Ok(Some(channel)) = if let Ok(Some(x)) = p
-								.channels(ctx)
-								.await
-								.map(|x| x.get(&new_message.channel_id).cloned())
-							{
-								Ok(Some(x))
-							} else {
-								p.get_active_threads(ctx).await.map(|x| {
-									x.threads
-										.iter()
-										.find(|th| th.id == new_message.channel_id)
-										.cloned()
+							&& let Ok(chs) = p.channels(ctx).await
+							&& let Ok(Some(channel)) =
+								if let Some(x) = chs.get(&new_message.channel_id).cloned() {
+									Ok(Some(x))
+								} else {
+									p.get_active_threads(ctx).await.map(|x| {
+										x.threads
+											.iter()
+											.find(|th| th.id == new_message.channel_id)
+											.cloned()
+									})
+								} && p
+							.user_permissions_in(&channel, &member)
+							.contains(Permissions::VIEW_CHANNEL)
+							&& channel.parent_id.is_none_or(|x| {
+								chs.get(&x).is_some_and(|x| {
+									p.user_permissions_in(x, &member)
+										.contains(Permissions::VIEW_CHANNEL)
 								})
-							} && let perms = p.user_permissions_in(&channel, &member)
-							&& perms.contains(Permissions::VIEW_CHANNEL)
-							&& (channel.kind != ChannelType::PrivateThread
-								|| channel
-									.id
-									.get_thread_member(ctx, member.user.id, true)
-									.await
-									.ok()
-									.map(|x| x.user_id) == Some(member.user.id))
+							}) && (channel.kind != ChannelType::PrivateThread
+							|| channel
+								.id
+								.get_thread_member(ctx, member.user.id, true)
+								.await
+								.ok()
+								.map(|x| x.user_id) == Some(member.user.id))
 						{
 							_ = person_id
 								.direct_message(
