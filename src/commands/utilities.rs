@@ -2,7 +2,9 @@ use std::iter;
 use std::sync::LazyLock;
 
 use anyhow::{Error, anyhow};
-use poise::serenity_prelude::{self as serenity, ChannelType, EditThread, Timestamp};
+use poise::serenity_prelude::{
+	self as serenity, CacheHttp, ChannelType, EditThread, GetMessages, Mentionable, Timestamp,
+};
 use rand::Rng;
 use std::time::Duration;
 
@@ -387,4 +389,106 @@ pub async fn edit(
 	.await?;
 
 	Ok(())
+}
+
+/// Deletes messages from a channel, optionally by a user
+#[poise::command(
+	ephemeral,
+	slash_command,
+	prefix_command,
+	category = "Utilities",
+	required_permissions = "MANAGE_MESSAGES"
+)]
+pub async fn purge(
+	ctx: Context<'_>,
+	#[description = "User to delete messages from"] user: Option<serenity::User>,
+	#[description = "Amount of messages to delete"] amount: u8,
+) -> Result<(), Error> {
+	let channel_id = ctx.channel_id();
+	let mut messages_to_delete = match user {
+		Some(ref user) => get_messages_from_user(user.clone(), amount, &ctx).await?,
+		None => get_n_messages(amount, &ctx).await?,
+	};
+
+	ctx.defer_ephemeral().await?;
+	if amount as usize > messages_to_delete.len() {
+		ctx.say("Not enough messages to delete, deleting as many as possible.")
+			.await?;
+	}
+	let chunks = messages_to_delete.chunks(100);
+	for chunk in chunks {
+		channel_id.delete_messages(&ctx, chunk).await?;
+	}
+	let user_str = match user {
+		Some(ref user) => format!("by {}", user.mention()),
+		None => String::new(),
+	};
+
+	ctx.say(format!("Deleted {amount} messages {user_str}"))
+		.await?;
+	Ok(())
+}
+
+async fn get_messages_from_user(
+	user: serenity::User,
+	amount: u8,
+	ctx: &Context<'_>,
+) -> Result<Vec<serenity::Message>, Error> {
+	let channel_id = ctx.channel_id();
+	let mut messages_to_delete = Vec::with_capacity(amount as usize);
+	while messages_to_delete.len() < amount as usize {
+		let messages = channel_id
+			.messages(ctx.http(), GetMessages::new().limit(100))
+			.await?;
+
+		if messages.is_empty() {
+			break; // No more messages to fetch
+		}
+
+		let user_messages: Vec<serenity::Message> = messages
+			.into_iter()
+			.filter(|m| m.author.id == user.id)
+			.collect();
+
+		messages_to_delete.extend(user_messages);
+	}
+
+	todo!()
+}
+
+async fn get_n_messages(amount: u8, ctx: &Context<'_>) -> Result<Vec<serenity::Message>, Error> {
+	let channel_id = ctx.channel_id();
+	if amount <= 100 {
+		let messages = channel_id
+			.messages(ctx.http(), GetMessages::new().limit(amount))
+			.await?;
+		return Ok(messages);
+	}
+
+	// Fetch messages in batches of 100 until we have enough
+	let q = amount / 100;
+	let r = amount % 100;
+	let mut messages_to_delete = Vec::with_capacity(amount as usize);
+	let mut last_message_id = None;
+	for _ in 0..q {
+		let mut builder = GetMessages::new().limit(100);
+		if let Some(last_id) = last_message_id {
+			builder = builder.before(last_id);
+		}
+		let messages = channel_id.messages(ctx.http(), builder).await?;
+		if messages.is_empty() {
+			break; // No more messages to fetch
+		}
+		last_message_id = messages.last().map(|m| m.id);
+		messages_to_delete.extend(messages);
+	}
+	if r > 0 {
+		let mut builder = GetMessages::new().limit(r);
+		if let Some(last_id) = last_message_id {
+			builder = builder.before(last_id);
+		}
+		let messages = channel_id.messages(ctx.http(), builder).await?;
+		messages_to_delete.extend(messages);
+	}
+	Ok(messages_to_delete)
 }
