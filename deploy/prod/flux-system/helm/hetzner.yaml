@@ -1,0 +1,49 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: hcloud
+  namespace: flux-system
+spec:
+  interval: 53m7s # prime number of seconds
+  url: https://charts.hetzner.cloud
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hccm
+  namespace: flux-system
+spec:
+  chart:
+    spec:
+      chart: hcloud-cloud-controller-manager
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: hcloud
+        namespace: flux-system
+      version: 1.29.x
+  interval: 1m0s
+  releaseName: hccm
+  storageNamespace: kube-system
+  targetNamespace: kube-system
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hcloud-csi
+  namespace: flux-system
+spec:
+  chart:
+    spec:
+      chart: hcloud-csi
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: hcloud
+        namespace: flux-system
+      version: 2.18.x
+  interval: 1m0s
+  releaseName: hcloud-csi
+  storageNamespace: kube-system
+  targetNamespace: kube-system

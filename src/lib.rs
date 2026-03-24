@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use anyhow::{Error, anyhow};
 use futures::StreamExt;
-use poise::serenity_prelude::{self as serenity, Permissions};
+use poise::serenity_prelude::{self as serenity, ChannelType, Permissions};
 use rand::{Rng, seq::IteratorRandom};
 use tracing::{debug, info, warn};
 
@@ -325,6 +325,13 @@ async fn event_handler(
 								})
 							} && let perms = p.user_permissions_in(&channel, &member)
 							&& perms.contains(Permissions::VIEW_CHANNEL)
+							&& (channel.kind != ChannelType::PrivateThread
+								|| channel
+									.id
+									.get_thread_member(ctx, member.user.id, true)
+									.await
+									.ok()
+									.map(|x| x.user_id) == Some(member.user.id))
 						{
 							_ = person_id
 								.direct_message(

@@ -103,7 +103,7 @@ fn app(config: &Config) -> Result<(), AppError> {
 			config
 				.secrets
 				.iter()
-				.map(|(k, v)| (k.clone(), v.clone()))
+				.map(|(k, v)| (k.to_uppercase(), v.clone()))
 				.collect(),
 		);
 
@@ -177,7 +177,7 @@ fn main() {
 			.merge(Serialized::defaults(&*DEFAULT_CONFIG))
 			.merge(Toml::file(&config_file))
 			.merge(Toml::file(&config_secrets_file))
-			.merge(Env::prefixed("FERRIS_").split("_"))
+			.merge(Env::prefixed("FERRIS_").split("__"))
 			.extract()
 			.context(ConfigSnafu)
 	}) {

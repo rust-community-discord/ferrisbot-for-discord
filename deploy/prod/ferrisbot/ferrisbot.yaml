@@ -1,0 +1,142 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litestream
+  namespace: ferrisbot
+data:
+  litestream.yml: |
+    dbs:
+      - path: /database/ferris.sqlite3
+        replica:
+          url: s3://ferrisbot-litestream/ferris.sqlite3
+          endpoint: https://nbg1.your-objectstorage.com
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ferrisbot
+  namespace: ferrisbot
+data:
+  ferris.toml: |
+    [database]
+    disabled = false
+    url = "sqlite://database/ferris.sqlite3"
+
+    [log]
+    filter = ""
+    rotation = "daily"
+    dir = "logs"
+    prefix = "ferris"
+    suffix = "log"
+    max_files = 10
+  ferris.secrets.toml: |
+    [secrets]
+    # ID of the Discord guild that the application will run on
+    DISCORD_GUILD = "273534239310479360"
+    APPLICATION_ID = "275357149477994498"
+    MOD_ROLE_ID = "631915156854538260"
+    RUSTACEAN_ROLE_ID = "319953207193501696"
+    MODMAIL_CHANNEL_ID = "935643214818443265"
+    MODLOG_CHANNEL_ID = "935643214818443265"
+    GODBOLT_UPDATE_DURATION = "1"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ferrisbot
+  namespace: ferrisbot
+spec:
+  selector:
+    matchLabels:
+      app: ferrisbot
+  serviceName: ferrisbot
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ferrisbot
+    spec:
+      initContainers:
+        - name: init-litestream
+          image: litestream/litestream:0.5.6
+          args:
+            [
+              "restore",
+              "-if-db-not-exists",
+              "-if-replica-exists",
+              "/database/ferris.sqlite3",
+            ]
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+            - name: litestream-config
+              mountPath: /etc/litestream.yml
+              subPath: litestream.yml
+          env:
+            - name: LITESTREAM_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: access-key
+            - name: LITESTREAM_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: secret-key
+      containers:
+        - name: ferrisbot
+          image: ghcr.io/rust-community-discord/ferrisbot-for-discord:caf04f8
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+            - name: ferrisbot-config
+              mountPath: /config
+          env:
+            - name: FERRIS_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ferrisbot
+                  key: discord-token
+        - name: litestream
+          image: litestream/litestream:0.5.6
+          args: ["replicate"]
+          volumeMounts:
+            - name: ferrisbot-sqlite
+              mountPath: /database
+            - name: litestream-config
+              mountPath: /etc/litestream.yml
+              subPath: litestream.yml
+          env:
+            - name: LITESTREAM_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: access-key
+            - name: LITESTREAM_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backup-store
+                  key: secret-key
+          ports:
+            - name: metrics
+              containerPort: 9090
+      imagePullSecrets:
+      - name: ghcr-secret
+      volumes:
+        - name: litestream-config
+          configMap:
+            name: litestream
+        - name: ferrisbot-config
+          configMap:
+            name: ferrisbot
+  volumeClaimTemplates:
+    - metadata:
+        name: ferrisbot-sqlite
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: hcloud-volumes

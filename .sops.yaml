@@ -1,0 +1,5 @@
+creation_rules:
+  - path_regex: "^deploy/prod/.*secrets\\.yaml$"
+    encrypted_regex: "^(data|stringData)$"
+    age:
+      - age1d36v9zvqg5fraumcpg470etkjtztyz0fw8dgj5v5pmd9mr0t29zq3gzkhh
