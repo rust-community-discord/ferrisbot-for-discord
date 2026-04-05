@@ -195,7 +195,6 @@ pub async fn serenity(
 
 	// Don't include presence updates, as they consume a lot of memory and CPU.
 	let intents = serenity::GatewayIntents::non_privileged()
-		| serenity::GatewayIntents::GUILD_PRESENCES
 		| serenity::GatewayIntents::GUILD_MEMBERS
 		| serenity::GatewayIntents::MESSAGE_CONTENT;
 

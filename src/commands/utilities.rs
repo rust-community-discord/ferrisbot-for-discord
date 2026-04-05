@@ -470,17 +470,11 @@ pub async fn user(
 	let member = guild.member(ctx.http(), uid).await?;
 	let joined_at = member.joined_at.unwrap_or_default();
 	let roles = member.roles(ctx.cache()).unwrap_or_default();
-	let status = guild.presences.get(&user.id);
-	let status = match status {
-		Some(status) => status.status,
-		None => serenity::OnlineStatus::Offline,
-	};
 
 	let thumbnail = user.avatar_url().unwrap_or_default();
 	let fields = [
 		("Created At", format!("{created_at}"), true),
 		("Joined At", format!("{joined_at}"), true),
-		("Status", status.name().to_string(), true),
 	];
 	let embed = CreateEmbed::new()
 		.title(format!("{name} ({handle})"))
