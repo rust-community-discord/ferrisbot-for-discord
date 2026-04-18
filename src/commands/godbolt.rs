@@ -2,6 +2,7 @@ use std::{collections::HashMap, mem::take};
 
 use anyhow::{Error, anyhow};
 use poise::{CodeBlockError, KeyValueArgs};
+use reqwest_middleware::ClientWithMiddleware;
 use syn::spanned::Spanned;
 use tracing::warn;
 
@@ -73,7 +74,7 @@ struct GodboltRequest<'a> {
 /// full optimizations (-O3)
 /// Returns a multiline string with the pretty printed assembly
 async fn compile_rust_source(
-	http: &reqwest::Client,
+	http: &ClientWithMiddleware,
 	request: &GodboltRequest<'_>,
 ) -> Result<Compilation, Error> {
 	let tools = make_tools_json(request.run_llvm_mca);
@@ -116,7 +117,7 @@ async fn compile_rust_source(
 	})
 }
 
-async fn save_to_shortlink(http: &reqwest::Client, req: &GodboltRequest<'_>) -> String {
+async fn save_to_shortlink(http: &ClientWithMiddleware, req: &GodboltRequest<'_>) -> String {
 	#[derive(serde::Deserialize)]
 	struct GodboltShortenerResponse {
 		url: String,
