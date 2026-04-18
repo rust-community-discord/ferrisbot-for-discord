@@ -66,6 +66,16 @@ fn bench(functions: &[(&str, fn())]) {
 	help_text_fn = "microbench_help",
 	category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn microbench(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,

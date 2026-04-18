@@ -17,6 +17,16 @@ use super::{
 	help_text_fn = "procmacro_help",
 	category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn procmacro(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,

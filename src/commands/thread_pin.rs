@@ -35,6 +35,16 @@ async fn can_pin_in_thread(ctx: Context<'_>) -> Result<(), ThreadPinError> {
 }
 
 #[poise::command(context_menu_command = "Pin Message to Thread", guild_only)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn thread_pin(ctx: Context<'_>, message: serenity::Message) -> Result<()> {
 	let reply = match can_pin_in_thread(ctx).await {
 		Ok(()) => {

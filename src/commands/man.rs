@@ -13,6 +13,16 @@ const USER_AGENT: &str = "kangalioo/rustbot";
 	broadcast_typing,
 	category = "Utilities"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn man(
 	ctx: Context<'_>,
 	#[description = "Section of the man page"] section: Option<String>,

@@ -321,6 +321,16 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);
@@ -375,6 +385,16 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);
@@ -413,6 +433,16 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);

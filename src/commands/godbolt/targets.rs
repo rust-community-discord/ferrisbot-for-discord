@@ -214,6 +214,16 @@ impl<'a> From<&'a str> for SemverRanking<'a> {
 
 /// Lists all available godbolt rustc targets
 #[poise::command(prefix_command, slash_command, broadcast_typing, category = "Godbolt")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn targets(ctx: Context<'_>) -> Result<(), Error> {
 	let mut targets = fetch_godbolt_metadata(ctx.data()).await.targets.clone();
 

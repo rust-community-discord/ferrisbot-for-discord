@@ -25,6 +25,16 @@ const MAX_TIME_SPAN: Duration = Duration::from_hours(2);
 	required_permissions = "MANAGE_MESSAGES",
 	required_bot_permissions = "MANAGE_MESSAGES | MANAGE_WEBHOOKS | MANAGE_THREADS | SEND_MESSAGES_IN_THREADS"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn move_messages_context_menu(ctx: Context<'_>, msg: Message) -> Result<()> {
 	Box::pin(move_messages(ctx, msg)).await
 }

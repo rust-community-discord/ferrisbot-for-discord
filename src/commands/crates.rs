@@ -117,6 +117,16 @@ async fn autocomplete_crate(ctx: Context<'_>, partial: &str) -> impl Iterator<It
 	broadcast_typing,
 	category = "Crates"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn crate_(
 	ctx: Context<'_>,
 	#[description = "Name of the searched crate"]
@@ -225,6 +235,16 @@ fn rustc_crate_link(crate_name: &str) -> Option<&'static str> {
 	track_edits,
 	slash_command,
 	category = "Crates"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn doc(
 	ctx: Context<'_>,

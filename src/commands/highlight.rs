@@ -16,12 +16,32 @@ use sqlx::{Pool, Sqlite};
 	subcommands("add", "remove", "list", "mat"),
 	subcommand_required
 )]
-pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
+pub async fn highlight(ctx: Context<'_>) -> Result<(), Error> {
 	Ok(())
 }
 
 #[poise::command(prefix_command, slash_command)]
 /// Adds a highlight. When a highlight is matched, you will receive a DM.
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %c.command().qualified_name,
+		author.id = c.author().id.get(),
+		channel.id = c.channel_id().get(),
+		guild.id = c.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
 
@@ -40,6 +60,16 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 
 #[poise::command(prefix_command, slash_command)]
 /// Removes a highlight by ID.
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %c.command().qualified_name,
+		author.id = c.author().id.get(),
+		channel.id = c.channel_id().get(),
+		guild.id = c.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn remove(c: Context<'_>, id: i64) -> Result<()> {
 	let db = require_database!(c);
 
@@ -61,6 +91,16 @@ pub async fn remove(c: Context<'_>, id: i64) -> Result<()> {
 
 #[poise::command(prefix_command, slash_command)]
 /// Lists your current highlights
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %c.command().qualified_name,
+		author.id = c.author().id.get(),
+		channel.id = c.channel_id().get(),
+		guild.id = c.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn list(c: Context<'_>) -> Result<()> {
 	let db = require_database!(c);
 	let highlights = database::highlight_get(db, c.author().id).await?;
@@ -97,6 +137,16 @@ pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Resul
 
 #[poise::command(prefix_command, slash_command, rename = "match")]
 /// Tests if your highlights match a given string
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %c.command().qualified_name,
+		author.id = c.author().id.get(),
+		channel.id = c.channel_id().get(),
+		guild.id = c.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
 	let db = require_database!(c);
 	let x = matches(c.author().id, &haystack, db).await?;

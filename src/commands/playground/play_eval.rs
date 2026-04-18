@@ -61,6 +61,16 @@ async fn play_or_eval(
 	help_text_fn = "play_help",
 	category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn play(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,
@@ -89,6 +99,16 @@ hide_in_help, // don't clutter help menu with something that ?play can do too
 help_text_fn = "playwarn_help",
 category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn playwarn(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,
@@ -116,6 +136,16 @@ pub fn playwarn_help() -> String {
 	track_edits,
 	help_text_fn = "eval_help",
 	category = "Playground"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn eval(
 	ctx: Context<'_>,

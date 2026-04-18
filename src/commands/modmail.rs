@@ -24,6 +24,16 @@ async fn send_modmail_success(ctx: Context<'_>, modmail: &GuildChannel) -> Resul
 	hide_in_help,
 	category = "Modmail"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn modmail_context_menu_for_message(
 	ctx: Context<'_>,
 	#[description = "Message to automatically link when opening a modmail"]
@@ -46,6 +56,16 @@ pub async fn modmail_context_menu_for_message(
 	context_menu_command = "Open Modmail",
 	hide_in_help,
 	category = "Modmail"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn modmail_context_menu_for_user(
 	ctx: Context<'_>,
@@ -75,6 +95,16 @@ pub async fn modmail_context_menu_for_user(
 ///
 /// You can still always ping the Moderator role if you're comfortable doing so.
 #[poise::command(prefix_command, slash_command, ephemeral, category = "Modmail")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn modmail(
 	ctx: Context<'_>,
 	#[description = "What would you like to say?"] user_message: String,
