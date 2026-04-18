@@ -240,7 +240,7 @@ pub async fn paginate(ctx: Context<'_>, pages: &[String]) -> Result<(), serenity
 		// button was pressed
 		.filter(move |press| press.data.custom_id.starts_with(&ctx_id.to_string()))
 		// Timeout when no navigation button has been pressed for 24 hours
-		.timeout(std::time::Duration::from_secs(3600 * 24))
+		.timeout(std::time::Duration::from_hours(24))
 		.await
 	{
 		// Depending on which button was pressed, go to next or previous page

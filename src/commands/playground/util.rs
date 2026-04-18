@@ -344,7 +344,7 @@ pub async fn send_reply(
 		.await?
 		.await_component_interaction(ctx)
 		.filter(move |mci: &ComponentInteraction| mci.data.custom_id == custom_id)
-		.timeout(std::time::Duration::from_secs(600))
+		.timeout(std::time::Duration::from_mins(10))
 		.await
 	{
 		retry_pressed.defer(&ctx).await?;
