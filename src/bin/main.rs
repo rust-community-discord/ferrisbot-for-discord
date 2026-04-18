@@ -33,9 +33,18 @@ struct DatabaseConfig {
 }
 
 #[derive(Deserialize, Debug)]
+struct TelemetryConfig {
+	service_name: String,
+	deployment_environment: String,
+	sample_rate: f64,
+}
+
+#[derive(Deserialize, Debug)]
 struct Config {
 	log: LogConfig,
 	database: DatabaseConfig,
+	#[serde(default)]
+	telemetry: Option<TelemetryConfig>,
 	secrets: HashMap<String, String>,
 }
 
