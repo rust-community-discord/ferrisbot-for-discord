@@ -30,6 +30,11 @@ data:
     prefix = "ferris"
     suffix = "log"
     max_files = 10
+
+    [telemetry]
+    service_name = "ferrisbot"
+    deployment_environment = "production"
+    sample_rate = 0.2
   ferris.secrets.toml: |
     [secrets]
     # ID of the Discord guild that the application will run on
@@ -98,6 +103,15 @@ spec:
                 secretKeyRef:
                   name: ferrisbot
                   key: discord-token
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: https://api.honeycomb.io:443
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: ferrisbot
+                  key: honeycomb-headers
         - name: litestream
           image: litestream/litestream:0.5.6
           args: ["replicate"]
