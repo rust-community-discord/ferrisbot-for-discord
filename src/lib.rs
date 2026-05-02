@@ -129,7 +129,7 @@ pub async fn serenity(
 					),
 				],
 				edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
-					Duration::from_secs(60 * 5), // 5 minutes
+					Duration::from_mins(5), // 5 minutes
 				))),
 				..Default::default()
 			},

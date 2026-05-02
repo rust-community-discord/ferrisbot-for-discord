@@ -60,7 +60,7 @@ async fn update_godbolt_metadata(data: &Data) -> Result<(), Error> {
 			.and_then(|duration| duration.parse::<u64>().ok())
 			.map_or_else(
 				// Currently set for 12 hours
-				|| std::time::Duration::from_secs(60 * 60 * 12),
+				|| std::time::Duration::from_hours(12),
 				std::time::Duration::from_secs,
 			);
 

@@ -341,7 +341,7 @@ pub async fn edit(
 		let collector = serenity::MessageCollector::new(ctx.serenity_context())
 			.author_id(author_id)
 			.channel_id(channel_id)
-			.timeout(Duration::from_secs(60));
+			.timeout(Duration::from_mins(1));
 
 		match collector.next().await {
 			Some(msg) if !msg.content.is_empty() => msg.content,

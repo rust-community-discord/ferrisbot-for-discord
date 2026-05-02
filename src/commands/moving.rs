@@ -58,7 +58,7 @@ impl<'ctx> ChannelLock<'ctx> {
 	async fn wait_for_lock(ctx: &Context<'ctx>, channel: ChannelId) -> Result<Self> {
 		let start = std::time::Instant::now();
 
-		while start.elapsed() < Duration::from_secs(120) {
+		while start.elapsed() < Duration::from_mins(2) {
 			if let Some(lock) = Self::try_lock(ctx, channel) {
 				return Ok(lock);
 			}
@@ -538,7 +538,9 @@ impl MoveOptionsDialog {
 			.into_iter()
 			.map(|c| self.create_component(c))
 			// Combine adjacent button components.
-			.coalesce(|a, b| match (a, b) {
+			.coalesce(
+				#[allow(clippy::result_large_err, reason = "coalesce API is not under our control")] 
+				|a, b| match (a, b) {
 				(CreateActionRow::Buttons(mut a), CreateActionRow::Buttons(mut b)) => {
 					a.append(&mut b);
 					Ok(CreateActionRow::Buttons(a))
