@@ -57,6 +57,16 @@ struct TagStatsMember {
 
 /// Display a tag.
 #[poise::command(slash_command, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tag(ctx: Context<'_>, name: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let tag = database::tag_get(db, &name).await?;
@@ -84,6 +94,16 @@ pub async fn tag(ctx: Context<'_>, name: String) -> Result<(), Error> {
 		"tags_list",
 	)
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %_ctx.command().qualified_name,
+		author.id = _ctx.author().id.get(),
+		channel.id = _ctx.channel_id().get(),
+		guild.id = _ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags(_ctx: Context<'_>) -> Result<(), Error> {
 	// Can't be invoked directly
 	Ok(())
@@ -96,6 +116,16 @@ pub async fn tags(_ctx: Context<'_>) -> Result<(), Error> {
 	ephemeral,
 	category = "Tags",
 	aliases("add")
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn tags_create(ctx: Context<'_>, name: String, content: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
@@ -122,6 +152,16 @@ pub async fn tags_create(ctx: Context<'_>, name: String, content: String) -> Res
 	category = "Tags",
 	aliases("remove")
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_delete(ctx: Context<'_>, name: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	database::tag_delete(db, &name).await?;
@@ -132,6 +172,16 @@ pub async fn tags_delete(ctx: Context<'_>, name: String) -> Result<(), Error> {
 
 /// Creates an alias for an already existing tag so you can call it with either of the names.
 #[poise::command(rename = "alias", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_alias(ctx: Context<'_>, existing: String, new: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let tag_already_exists = database::tag_get(db, &new).await.is_ok();
@@ -149,6 +199,16 @@ pub async fn tags_alias(ctx: Context<'_>, existing: String, new: String) -> Resu
 
 /// Edits the content of an already existing tag.
 #[poise::command(rename = "edit", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_edit(ctx: Context<'_>, name: String, content: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let tag = database::tag_get(db, &name).await?;
@@ -170,6 +230,16 @@ pub async fn tags_edit(ctx: Context<'_>, name: String, content: String) -> Resul
 
 /// This will make the bot post the content in the bot-channel and ping the author upon being used.
 #[poise::command(rename = "restrict", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_restrict(ctx: Context<'_>, name: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	database::tag_restrict(db, &name).await?;
@@ -180,6 +250,16 @@ pub async fn tags_restrict(ctx: Context<'_>, name: String) -> Result<(), Error> 
 
 /// Shows information about the server tags. If you mention someone, it will show their tags instead.
 #[poise::command(rename = "stats", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_stats(ctx: Context<'_>, member: Option<serenity::UserId>) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let embed = if let Some(member) = member {
@@ -270,6 +350,16 @@ async fn tags_member_stats(
 
 /// Shows some stats collected about the tag.
 #[poise::command(rename = "info", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_info(ctx: Context<'_>, name: String) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let tag = database::tag_get(db, &name).await?;
@@ -311,6 +401,16 @@ pub async fn tags_info(ctx: Context<'_>, name: String) -> Result<(), Error> {
 
 /// Lists all tags in the server. If you mention someone, it will show their tags instead.
 #[poise::command(rename = "list", slash_command, ephemeral, category = "Tags")]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn tags_list(ctx: Context<'_>, member: Option<serenity::UserId>) -> Result<(), Error> {
 	let db = require_database!(ctx);
 	let tags = if let Some(member) = member {

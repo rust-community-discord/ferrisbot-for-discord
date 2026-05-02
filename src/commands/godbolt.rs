@@ -2,6 +2,7 @@ use std::{collections::HashMap, mem::take};
 
 use anyhow::{Error, anyhow};
 use poise::{CodeBlockError, KeyValueArgs};
+use reqwest_middleware::ClientWithMiddleware;
 use syn::spanned::Spanned;
 use tracing::warn;
 
@@ -73,7 +74,7 @@ struct GodboltRequest<'a> {
 /// full optimizations (-O3)
 /// Returns a multiline string with the pretty printed assembly
 async fn compile_rust_source(
-	http: &reqwest::Client,
+	http: &ClientWithMiddleware,
 	request: &GodboltRequest<'_>,
 ) -> Result<Compilation, Error> {
 	let tools = make_tools_json(request.run_llvm_mca);
@@ -116,7 +117,7 @@ async fn compile_rust_source(
 	})
 }
 
-async fn save_to_shortlink(http: &reqwest::Client, req: &GodboltRequest<'_>) -> String {
+async fn save_to_shortlink(http: &ClientWithMiddleware, req: &GodboltRequest<'_>) -> String {
 	#[derive(serde::Deserialize)]
 	struct GodboltShortenerResponse {
 		url: String,
@@ -320,6 +321,16 @@ fn parse(args: &str) -> Result<(KeyValueArgs, String), CodeBlockError> {
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);
@@ -374,6 +385,16 @@ pub async fn godbolt(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), 
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);
@@ -412,6 +433,16 @@ pub async fn mca(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Erro
 	reason = "not markdown, shown to end user"
 )]
 #[poise::command(prefix_command, category = "Godbolt", broadcast_typing, track_edits)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn llvmir(ctx: Context<'_>, #[rest] arguments: String) -> Result<(), Error> {
 	let (params, mut code) = parse(&arguments)?;
 	let no_mangle_added = add_no_mangle(&mut code);

@@ -5,6 +5,11 @@ use figment::{
 	Figment,
 	providers::{Env, Format as _, Serialized, Toml},
 };
+use opentelemetry::{KeyValue, trace::TracerProvider as _};
+use opentelemetry_sdk::{
+	Resource,
+	trace::{Sampler, SdkTracerProvider},
+};
 use serde::Deserialize;
 use serde_json::json;
 use snafu::{Report, ResultExt as _, Snafu};
@@ -33,9 +38,18 @@ struct DatabaseConfig {
 }
 
 #[derive(Deserialize, Debug)]
+struct TelemetryConfig {
+	service_name: String,
+	deployment_environment: String,
+	sample_rate: f64,
+}
+
+#[derive(Deserialize, Debug)]
 struct Config {
 	log: LogConfig,
 	database: DatabaseConfig,
+	#[serde(default)]
+	telemetry: Option<TelemetryConfig>,
 	secrets: HashMap<String, String>,
 }
 
@@ -197,6 +211,24 @@ fn main() {
 		}
 	};
 	let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+	// Build the OTel tracer provider before the subscriber so we can attach a
+	// tracing-opentelemetry layer that ships spans to Honeycomb (or any OTLP
+	// backend). Absent [telemetry] section disables it cleanly for local dev.
+	let tracer_provider = match config.telemetry.as_ref() {
+		Some(telemetry) => match Report::capture_into_result(|| build_tracer_provider(telemetry)) {
+			Ok(tp) => Some(tp),
+			Err(err) => {
+				error!(%err, "failed to init OpenTelemetry tracer provider");
+				return;
+			}
+		},
+		None => None,
+	};
+	let otel_layer = tracer_provider
+		.as_ref()
+		.map(|tp| tracing_opentelemetry::layer().with_tracer(tp.tracer("ferrisbot")));
+
 	let subscriber = match Report::capture_into_result(|| {
 		Ok::<_, AppError>(
 			Registry::default()
@@ -206,6 +238,7 @@ fn main() {
 						.with_writer(non_blocking),
 				)
 				.with(fmt::Layer::default().with_writer(std::io::stderr))
+				.with(otel_layer)
 				.with(
 					EnvFilter::builder()
 						.with_default_directive(LevelFilter::INFO.into())
@@ -244,6 +277,41 @@ fn main() {
 			warn!("shutdown because of panic")
 		}
 	}
+
+	// Flush any buffered spans before exit; the BatchSpanProcessor drops them
+	// otherwise. Best-effort: a failure here is not actionable.
+	if let Some(tp) = tracer_provider
+		&& let Err(e) = tp.shutdown()
+	{
+		warn!(error = %e, "OpenTelemetry tracer shutdown failed");
+	}
+}
+
+fn build_tracer_provider(cfg: &TelemetryConfig) -> Result<SdkTracerProvider, AppError> {
+	let exporter = opentelemetry_otlp::SpanExporter::builder()
+		.with_tonic()
+		.build()
+		.context(OtlpSnafu)?;
+
+	let provider = SdkTracerProvider::builder()
+		.with_batch_exporter(exporter)
+		.with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+			cfg.sample_rate,
+		))))
+		.with_resource(
+			Resource::builder()
+				.with_service_name(cfg.service_name.clone())
+				.with_attribute(KeyValue::new("service.version", env!("CARGO_PKG_VERSION")))
+				.with_attribute(KeyValue::new(
+					"deployment.environment.name",
+					cfg.deployment_environment.clone(),
+				))
+				.build(),
+		)
+		.build();
+
+	opentelemetry::global::set_tracer_provider(provider.clone());
+	Ok(provider)
 }
 
 fn check_for_config_files(main: &PathBuf, secrets: &PathBuf) {
@@ -280,5 +348,9 @@ enum AppError {
 	Serenity {
 		#[snafu(source(from(poise::serenity_prelude::Error, Box::new)))]
 		source: Box<poise::serenity_prelude::Error>,
+	},
+	#[snafu(display("failed to build OTLP span exporter"))]
+	Otlp {
+		source: opentelemetry_otlp::ExporterBuildError,
 	},
 }

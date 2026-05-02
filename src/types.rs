@@ -5,6 +5,8 @@ use std::{
 
 use anyhow::{Error, Result};
 use poise::serenity_prelude as serenity;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_tracing::TracingMiddleware;
 use tokio::sync::RwLock;
 
 use crate::{SecretStore, commands};
@@ -22,7 +24,7 @@ pub struct Data {
 	pub modlog_channel_id: serenity::ChannelId,
 	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
 	pub bot_start_time: std::time::Instant,
-	pub http: reqwest::Client,
+	pub http: ClientWithMiddleware,
 	pub godbolt_metadata: StdMutex<commands::godbolt::GodboltMetadata>,
 	pub move_channel_locks: StdMutex<HashSet<serenity::ChannelId>>,
 }
@@ -46,7 +48,9 @@ impl Data {
 			modlog_channel_id: secret_store.get_discord_id("MODLOG_CHANNEL_ID")?.into(),
 			modmail_message: Arc::default(),
 			bot_start_time: std::time::Instant::now(),
-			http: reqwest::Client::new(),
+			http: ClientBuilder::new(reqwest::Client::new())
+				.with(TracingMiddleware::default())
+				.build(),
 			godbolt_metadata: StdMutex::new(commands::godbolt::GodboltMetadata::default()),
 			move_channel_locks: StdMutex::new(HashSet::new()),
 		})

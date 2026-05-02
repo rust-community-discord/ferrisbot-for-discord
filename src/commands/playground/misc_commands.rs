@@ -24,6 +24,16 @@ use super::{
 	help_text_fn = "miri_help",
 	category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn miri(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,
@@ -84,6 +94,16 @@ pub fn miri_help() -> String {
 	track_edits,
 	help_text_fn = "expand_help",
 	category = "Playground"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn expand(
 	ctx: Context<'_>,
@@ -161,6 +181,16 @@ pub fn expand_help() -> String {
 	help_text_fn = "clippy_help",
 	category = "Playground"
 )]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
+)]
 pub async fn clippy(
 	ctx: Context<'_>,
 	flags: poise::KeyValueArgs,
@@ -229,6 +259,16 @@ pub fn clippy_help() -> String {
 	track_edits,
 	help_text_fn = "fmt_help",
 	category = "Playground"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn fmt(
 	ctx: Context<'_>,

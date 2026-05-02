@@ -3,6 +3,7 @@ use anyhow::{anyhow, bail};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use reqwest::header;
+use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use tracing::info;
 
@@ -34,7 +35,7 @@ struct Crate {
 }
 
 /// Queries the crates.io crates list for a specific crate
-async fn get_crate(http: &reqwest::Client, query: &str) -> Result<Crate> {
+async fn get_crate(http: &ClientWithMiddleware, query: &str) -> Result<Crate> {
 	info!("searching for crate `{}`", query);
 
 	let crate_list = http
@@ -115,6 +116,16 @@ async fn autocomplete_crate(ctx: Context<'_>, partial: &str) -> impl Iterator<It
 	rename = "crate",
 	broadcast_typing,
 	category = "Crates"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn crate_(
 	ctx: Context<'_>,
@@ -224,6 +235,16 @@ fn rustc_crate_link(crate_name: &str) -> Option<&'static str> {
 	track_edits,
 	slash_command,
 	category = "Crates"
+)]
+#[tracing::instrument(
+	skip_all,
+	fields(
+		command = %ctx.command().qualified_name,
+		author.id = ctx.author().id.get(),
+		channel.id = ctx.channel_id().get(),
+		guild.id = ctx.guild_id().map(poise::serenity_prelude::GuildId::get),
+	),
+	err(Debug),
 )]
 pub async fn doc(
 	ctx: Context<'_>,
@@ -436,7 +457,7 @@ trait DocsClient {
 	async fn page_exists(&self, url: &str) -> bool;
 }
 
-impl DocsClient for reqwest::Client {
+impl DocsClient for ClientWithMiddleware {
 	async fn get_crate_docs(&self, crate_name: &str) -> Result<String> {
 		get_crate(self, crate_name)
 			.await
