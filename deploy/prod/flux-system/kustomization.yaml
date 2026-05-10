@@ -4,3 +4,5 @@ resources:
 - gotk-components.yaml
 - gotk-sync.yaml
 - helm/hetzner.yaml
+- notifications/discord.yaml
+- notifications/discord.secrets.yaml
