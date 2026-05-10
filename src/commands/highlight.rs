@@ -20,10 +20,11 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 	Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, ephemeral)]
 /// Adds a highlight. When a highlight is matched, you will receive a DM.
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
+	c.defer().await?;
 
 	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
 		c.say(format!("```\n{e}```")).await?;
@@ -33,7 +34,7 @@ pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	database::highlight_add(db, c.author().id, &regex).await?;
 
 	RegexHolder::update(c.data()).await;
-	c.say("hl added!").await?;
+	c.say(format!("added `{regex}` to your highlights")).await?;
 
 	Ok(())
 }
