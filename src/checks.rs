@@ -1,7 +1,8 @@
 use crate::types::Context;
 
 /// Returns the member's roles if available, handling both application and prefix contexts.
-fn get_member_roles(ctx: Context<'_>) -> Option<&[poise::serenity_prelude::RoleId]> {
+#[must_use]
+pub fn get_member_roles(ctx: Context<'_>) -> Option<&[poise::serenity_prelude::RoleId]> {
 	match ctx {
 		Context::Application(app_context) => app_context
 			.interaction

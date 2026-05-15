@@ -229,6 +229,7 @@ fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>>
 		commands::utilities::solved(),
 		commands::utilities::edit(),
 		commands::thread_pin::thread_pin(),
+		commands::report_slop::report_slop(),
 		commands::modmail::modmail(),
 		commands::modmail::modmail_context_menu_for_message(),
 		commands::modmail::modmail_context_menu_for_user(),

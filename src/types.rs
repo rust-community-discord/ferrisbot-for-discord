@@ -18,9 +18,11 @@ pub struct Data {
 	pub mod_role_id: serenity::RoleId,
 	pub mod_consultant_role_id: serenity::RoleId,
 	pub rustacean_role_id: serenity::RoleId,
+	pub banned_from_reporting_role_id: serenity::RoleId,
 	pub modmail_channel_id: serenity::ChannelId,
 	pub modlog_channel_id: serenity::ChannelId,
 	pub modmail_message: Arc<tokio::sync::RwLock<Option<serenity::Message>>>,
+	pub report_slop_lock_duration: std::time::Duration,
 	pub bot_start_time: std::time::Instant,
 	pub http: reqwest::Client,
 	pub godbolt_metadata: StdMutex<commands::godbolt::GodboltMetadata>,
@@ -42,9 +44,18 @@ impl Data {
 				.get_discord_id("MOD_CONSULTANT_ROLE_ID")?
 				.into(),
 			rustacean_role_id: secret_store.get_discord_id("RUSTACEAN_ROLE_ID")?.into(),
+			banned_from_reporting_role_id: secret_store
+				.get_discord_id("BANNED_FROM_REPORTING_ROLE_ID")?
+				.into(),
 			modmail_channel_id: secret_store.get_discord_id("MODMAIL_CHANNEL_ID")?.into(),
 			modlog_channel_id: secret_store.get_discord_id("MODLOG_CHANNEL_ID")?.into(),
 			modmail_message: Arc::default(),
+			report_slop_lock_duration: std::time::Duration::from_secs(
+				60 * secret_store
+					.get("LOCK_DURATION_MINUTES")
+					.and_then(|v| v.parse::<u64>().ok())
+					.unwrap_or(30),
+			),
 			bot_start_time: std::time::Instant::now(),
 			http: reqwest::Client::new(),
 			godbolt_metadata: StdMutex::new(commands::godbolt::GodboltMetadata::default()),
