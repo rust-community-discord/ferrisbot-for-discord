@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - crd.yaml
   - controller.yaml
+  - server-plan.yaml
