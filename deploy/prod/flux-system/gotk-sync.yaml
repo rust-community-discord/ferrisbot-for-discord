@@ -8,7 +8,7 @@ metadata:
 spec:
   interval: 1m0s
   ref:
-    branch: main
+    branch: conrad/deploy
   secretRef:
     name: flux-system
   url: https://github.com/rust-community-discord/ferrisbot-for-discord.git
