@@ -22,7 +22,7 @@ spec:
         kind: HelmRepository
         name: hcloud
         namespace: flux-system
-      version: 1.29.x
+      version: 1.31.x
   interval: 1m0s
   releaseName: hccm
   storageNamespace: kube-system
@@ -42,7 +42,7 @@ spec:
         kind: HelmRepository
         name: hcloud
         namespace: flux-system
-      version: 2.18.x
+      version: 2.21.x
   interval: 1m0s
   releaseName: hcloud-csi
   storageNamespace: kube-system
