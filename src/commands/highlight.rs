@@ -20,6 +20,11 @@ fn sanitize_content(content: &str) -> String {
 	CUSTOM_EMOJI.replace_all(content, " ").into_owned()
 }
 
+/// Compiles a pattern; case-insensitive unless the inline `(?-i)` flag is set.
+fn compile_pattern(pattern: &str) -> Result<Regex, regex::Error> {
+	RegexBuilder::new(pattern).case_insensitive(true).build()
+}
+
 #[allow(clippy::unused_async)]
 #[poise::command(
 	prefix_command,
@@ -102,9 +107,7 @@ pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Resul
 	Ok(patterns
 		.into_iter()
 		.filter_map(|(_id, pattern)| {
-			RegexBuilder::new(&pattern)
-				.case_insensitive(true)
-				.build()
+			compile_pattern(&pattern)
 				.ok()
 				.filter(|regex| regex.is_match(haystack))
 				.map(|_| pattern)
@@ -149,15 +152,23 @@ impl RegexHolder {
 			}
 		};
 
-		let entries = rows
+		Self::from_patterns(
+			rows.into_iter()
+				.map(|(member_id, highlight)| (UserId::new(member_id.cast_unsigned()), highlight)),
+		)
+	}
+
+	/// Compiles `(user, pattern)` pairs into a holder, skipping invalid patterns.
+	fn from_patterns(patterns: impl IntoIterator<Item = (UserId, String)>) -> Self {
+		use tracing::warn;
+
+		let entries = patterns
 			.into_iter()
-			.filter_map(|(member_id, highlight)| {
-				match RegexBuilder::new(&highlight).case_insensitive(true).build() {
-					Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
-					Err(e) => {
-						warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
-						None
-					}
+			.filter_map(|(member_id, highlight)| match compile_pattern(&highlight) {
+				Ok(regex) => Some((member_id, regex)),
+				Err(e) => {
+					warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
+					None
 				}
 			})
 			.collect();
