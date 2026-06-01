@@ -310,7 +310,8 @@ async fn event_handler(
 				let message_link = &*message_link;
 				let mut stream = futures::stream::iter(matches)
 					.map(|(person_id, matcher)| async move {
-						if let Ok(member) = gid.member(ctx, person_id).await
+						if person_id != new_message.author.id
+							&& let Ok(member) = gid.member(ctx, person_id).await
 							&& let Ok(p) = gid.to_partial_guild(ctx).await
 							&& let Ok(Some(channel)) = if let Ok(Some(x)) = p
 								.channels(ctx)
