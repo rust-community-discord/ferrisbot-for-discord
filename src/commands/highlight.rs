@@ -25,7 +25,11 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
 
-	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
+	if let Err(e) = RegexBuilder::new(&regex)
+		.size_limit(1 << 10)
+		.case_insensitive(true)
+		.build()
+	{
 		c.say(format!("```\n{e}```")).await?;
 		return Ok(());
 	}
@@ -87,7 +91,9 @@ pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Resul
 	Ok(patterns
 		.into_iter()
 		.filter_map(|(_id, pattern)| {
-			Regex::new(&pattern)
+			RegexBuilder::new(&pattern)
+				.case_insensitive(true)
+				.build()
 				.ok()
 				.filter(|regex| regex.is_match(haystack))
 				.map(|_| pattern)
@@ -134,11 +140,13 @@ impl RegexHolder {
 
 		let entries = rows
 			.into_iter()
-			.filter_map(|(member_id, highlight)| match Regex::new(&highlight) {
-				Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
-				Err(e) => {
-					warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
-					None
+			.filter_map(|(member_id, highlight)| {
+				match RegexBuilder::new(&highlight).case_insensitive(true).build() {
+					Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
+					Err(e) => {
+						warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
+						None
+					}
 				}
 			})
 			.collect();
