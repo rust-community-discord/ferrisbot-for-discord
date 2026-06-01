@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use crate::{require_database, types::Context};
 use anyhow::{Error, Result};
@@ -8,6 +9,14 @@ use poise::{
 };
 use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Sqlite};
+
+static CUSTOM_EMOJI: LazyLock<Regex> =
+	LazyLock::new(|| Regex::new(r"<a?:\w+:\d+>").expect("valid custom-emoji regex"));
+
+/// Strips Discord custom-emoji markup so patterns don't match emoji names.
+fn sanitize_content(content: &str) -> String {
+	CUSTOM_EMOJI.replace_all(content, " ").into_owned()
+}
 
 #[allow(clippy::unused_async)]
 #[poise::command(
@@ -161,9 +170,10 @@ impl RegexHolder {
 
 	#[must_use]
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
+		let haystack = sanitize_content(haystack);
 		self.0
 			.iter()
-			.filter(|&(_user_id, regex)| regex.is_match(haystack))
+			.filter(|&(_user_id, regex)| regex.is_match(&haystack))
 			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
 			.collect()
 	}
