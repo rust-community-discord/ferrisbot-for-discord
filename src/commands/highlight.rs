@@ -12,6 +12,9 @@ use poise::{
 use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Sqlite};
 
+#[cfg(test)]
+mod tests;
+
 static CUSTOM_EMOJI: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"<a?:\w+:\d+>").expect("valid custom-emoji regex"));
 
