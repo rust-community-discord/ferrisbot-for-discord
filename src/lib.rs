@@ -68,6 +68,7 @@ impl From<serenity::Client> for ShuttleSerenity {
 pub async fn serenity(
 	secret_store: SecretStore,
 	database: Option<sqlx::SqlitePool>,
+	highlight_cooldown: Duration,
 ) -> Result<ShuttleSerenity, Error> {
 	let token = secret_store
 		.get("DISCORD_TOKEN")
@@ -85,7 +86,7 @@ pub async fn serenity(
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, database).await?;
+				let data = Data::new(&secret_store, database, highlight_cooldown).await?;
 
 				info!(
 					"Registering {} commands...",
@@ -304,6 +305,16 @@ async fn event_handler(
 			if let Some(gid) = new_message.guild_id
 				&& !new_message.author.bot
 			{
+				// Author is active in this channel, so don't ping them.
+				let now = std::time::Instant::now();
+				{
+					let (Ok(mut cooldowns) | Err(mut cooldowns)) = data
+						.highlight_cooldowns
+						.lock()
+						.map_err(std::sync::PoisonError::into_inner);
+					cooldowns.mark_active(new_message.author.id, new_message.channel_id, now);
+				}
+
 				let hl = data.highlights.read().await;
 				let matches = hl.find(&new_message.content);
 				let message_link = new_message.link();
@@ -336,6 +347,16 @@ async fn event_handler(
 									.ok()
 									.map(|x| x.user_id) == Some(member.user.id))
 						{
+							{
+								let now = std::time::Instant::now();
+								let (Ok(mut cooldowns) | Err(mut cooldowns)) = data
+									.highlight_cooldowns
+									.lock()
+									.map_err(std::sync::PoisonError::into_inner);
+								if !cooldowns.try_notify(person_id, new_message.channel_id, now) {
+									return;
+								}
+							}
 							_ = person_id
 								.direct_message(
 									ctx,

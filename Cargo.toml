@@ -14,6 +14,7 @@ ab_glyph = { version = "0.2", default-features = false }
 anyhow = "1.0"
 figment = { version = "0.10.19", features = ["env", "toml"] }
 futures = "0.3.31"
+humantime-serde = "1.1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 imageproc = { version = "0.25", default-features = false }
 itertools = "0.14"

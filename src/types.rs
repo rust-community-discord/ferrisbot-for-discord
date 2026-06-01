@@ -1,6 +1,7 @@
 use std::{
 	collections::HashSet,
 	sync::{Arc, Mutex as StdMutex},
+	time::Duration,
 };
 
 use anyhow::{Error, Result};
@@ -12,6 +13,7 @@ use crate::{SecretStore, commands};
 #[derive(Debug)]
 pub struct Data {
 	pub highlights: RwLock<commands::highlight::RegexHolder>,
+	pub highlight_cooldowns: StdMutex<commands::highlight::HighlightCooldowns>,
 	pub database: Option<sqlx::SqlitePool>,
 	pub discord_guild_id: serenity::GuildId,
 	pub application_id: serenity::UserId,
@@ -31,9 +33,13 @@ impl Data {
 	pub async fn new(
 		secret_store: &SecretStore,
 		database: Option<sqlx::SqlitePool>,
+		highlight_cooldown: Duration,
 	) -> Result<Self> {
 		Ok(Self {
 			highlights: RwLock::new(commands::highlight::RegexHolder::new(database.as_ref()).await),
+			highlight_cooldowns: StdMutex::new(commands::highlight::HighlightCooldowns::new(
+				highlight_cooldown,
+			)),
 			database,
 			discord_guild_id: secret_store.get_discord_id("DISCORD_GUILD")?.into(),
 			application_id: secret_store.get_discord_id("APPLICATION_ID")?.into(),

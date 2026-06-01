@@ -33,9 +33,16 @@ struct DatabaseConfig {
 }
 
 #[derive(Deserialize, Debug)]
+struct HighlightConfig {
+	#[serde(with = "humantime_serde")]
+	cooldown: std::time::Duration,
+}
+
+#[derive(Deserialize, Debug)]
 struct Config {
 	log: LogConfig,
 	database: DatabaseConfig,
+	highlight: HighlightConfig,
 	secrets: HashMap<String, String>,
 }
 
@@ -53,6 +60,9 @@ static DEFAULT_CONFIG: LazyLock<serde_json::Value> = LazyLock::new(|| {
 		"database": {
 			"disabled": false,
 			"url": "sqlite://database/ferris.sqlite3"
+		},
+		"highlight": {
+			"cooldown": "5m"
 		},
 		"secrets": {}
 	})
@@ -107,9 +117,10 @@ fn app(config: &Config) -> Result<(), AppError> {
 				.collect(),
 		);
 
-		let mut client = ferrisbot_for_discord::serenity(secret_store, pool)
-			.await
-			.context(SerenityInitSnafu)?;
+		let mut client =
+			ferrisbot_for_discord::serenity(secret_store, pool, config.highlight.cooldown)
+				.await
+				.context(SerenityInitSnafu)?;
 
 		info!("starting serenity...");
 

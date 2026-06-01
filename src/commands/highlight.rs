@@ -1,11 +1,13 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 use crate::{require_database, types::Context};
 use anyhow::{Error, Result};
 use poise::{
 	CreateReply,
-	serenity_prelude::{CreateEmbed, UserId},
+	serenity_prelude::{ChannelId, CreateEmbed, UserId},
 };
 use regex::{Regex, RegexBuilder};
 use sqlx::{Pool, Sqlite};
@@ -176,6 +178,55 @@ impl RegexHolder {
 			.filter(|&(_user_id, regex)| regex.is_match(&haystack))
 			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
 			.collect()
+	}
+}
+
+/// Per-`(user, channel)` cooldown expiry instants. Expired entries are swept
+/// lazily (at most once per window) by `mark_active`, so `try_notify` needn't prune.
+#[derive(Debug)]
+pub struct HighlightCooldowns {
+	window: Duration,
+	expiries: HashMap<(UserId, ChannelId), Instant>,
+	next_prune: Instant,
+}
+
+impl HighlightCooldowns {
+	#[must_use]
+	pub fn new(window: Duration) -> Self {
+		Self {
+			window,
+			expiries: HashMap::new(),
+			next_prune: Instant::now(),
+		}
+	}
+
+	/// Refreshes the cooldown unconditionally (the user posted, so don't ping them).
+	pub fn mark_active(&mut self, user: UserId, channel: ChannelId, now: Instant) {
+		self.expiries.insert((user, channel), now + self.window);
+		self.prune_amortised(now);
+	}
+
+	/// Starts a cooldown unless one is active; returns whether to send a DM.
+	pub fn try_notify(&mut self, user: UserId, channel: ChannelId, now: Instant) -> bool {
+		match self.expiries.entry((user, channel)) {
+			Entry::Occupied(entry) if *entry.get() > now => false,
+			Entry::Occupied(mut entry) => {
+				entry.insert(now + self.window);
+				true
+			}
+			Entry::Vacant(entry) => {
+				entry.insert(now + self.window);
+				true
+			}
+		}
+	}
+
+	fn prune_amortised(&mut self, now: Instant) {
+		if now < self.next_prune {
+			return;
+		}
+		self.expiries.retain(|_, expiry| *expiry > now);
+		self.next_prune = now + self.window;
 	}
 }
 
