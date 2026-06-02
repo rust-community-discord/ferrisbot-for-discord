@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, panic, path::PathBuf, str::FromStr, sync::LazyLock};
 
-use ferrisbot_for_discord::SecretStore;
+use ferrisbot_for_discord::{SecretStore, commands::highlight::HighlightConfig};
 use figment::{
 	Figment,
 	providers::{Env, Format as _, Serialized, Toml},
@@ -30,12 +30,6 @@ struct DatabaseConfig {
 	#[serde(default)]
 	disabled: bool,
 	url: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct HighlightConfig {
-	#[serde(with = "humantime_serde")]
-	cooldown: std::time::Duration,
 }
 
 #[derive(Deserialize, Debug)]
@@ -117,10 +111,9 @@ fn app(config: &Config) -> Result<(), AppError> {
 				.collect(),
 		);
 
-		let mut client =
-			ferrisbot_for_discord::serenity(secret_store, pool, config.highlight.cooldown)
-				.await
-				.context(SerenityInitSnafu)?;
+		let mut client = ferrisbot_for_discord::serenity(secret_store, pool, config.highlight)
+			.await
+			.context(SerenityInitSnafu)?;
 
 		info!("starting serenity...");
 

@@ -10,6 +10,7 @@ use poise::{
 	serenity_prelude::{ChannelId, CreateEmbed, UserId},
 };
 use regex::{Regex, RegexBuilder};
+use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
 
 #[cfg(test)]
@@ -195,6 +196,12 @@ impl RegexHolder {
 	}
 }
 
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub struct HighlightConfig {
+	#[serde(with = "humantime_serde")]
+	cooldown: std::time::Duration,
+}
+
 /// Per-`(user, channel)` cooldown expiry instants. Expired entries are swept
 /// lazily (at most once per window) by `mark_active`, so `try_notify` needn't prune.
 #[derive(Debug)]
@@ -206,9 +213,9 @@ pub struct HighlightCooldowns {
 
 impl HighlightCooldowns {
 	#[must_use]
-	pub fn new(window: Duration) -> Self {
+	pub fn new(config: HighlightConfig) -> Self {
 		Self {
-			window,
+			window: config.cooldown,
 			expiries: HashMap::new(),
 			next_prune: Instant::now(),
 		}

@@ -19,6 +19,7 @@ use poise::serenity_prelude::{self as serenity, ChannelType, Permissions};
 use rand::{Rng, seq::IteratorRandom};
 use tracing::{debug, info, warn};
 
+use crate::commands::highlight::HighlightConfig;
 use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
 use crate::types::Data;
 
@@ -68,7 +69,7 @@ impl From<serenity::Client> for ShuttleSerenity {
 pub async fn serenity(
 	secret_store: SecretStore,
 	database: Option<sqlx::SqlitePool>,
-	highlight_cooldown: Duration,
+	highlight: HighlightConfig,
 ) -> Result<ShuttleSerenity, Error> {
 	let token = secret_store
 		.get("DISCORD_TOKEN")
@@ -86,7 +87,7 @@ pub async fn serenity(
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, database, highlight_cooldown).await?;
+				let data = Data::new(&secret_store, database, highlight).await?;
 
 				info!(
 					"Registering {} commands...",

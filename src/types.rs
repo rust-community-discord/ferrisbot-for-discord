@@ -1,14 +1,16 @@
 use std::{
 	collections::HashSet,
 	sync::{Arc, Mutex as StdMutex},
-	time::Duration,
 };
 
 use anyhow::{Error, Result};
 use poise::serenity_prelude as serenity;
 use tokio::sync::RwLock;
 
-use crate::{SecretStore, commands};
+use crate::{
+	SecretStore,
+	commands::{self, highlight::HighlightConfig},
+};
 
 #[derive(Debug)]
 pub struct Data {
@@ -33,12 +35,12 @@ impl Data {
 	pub async fn new(
 		secret_store: &SecretStore,
 		database: Option<sqlx::SqlitePool>,
-		highlight_cooldown: Duration,
+		highlight: HighlightConfig,
 	) -> Result<Self> {
 		Ok(Self {
 			highlights: RwLock::new(commands::highlight::RegexHolder::new(database.as_ref()).await),
 			highlight_cooldowns: StdMutex::new(commands::highlight::HighlightCooldowns::new(
-				highlight_cooldown,
+				highlight,
 			)),
 			database,
 			discord_guild_id: secret_store.get_discord_id("DISCORD_GUILD")?.into(),

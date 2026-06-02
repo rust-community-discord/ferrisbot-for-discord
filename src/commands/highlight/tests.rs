@@ -2,9 +2,12 @@ use std::time::{Duration, Instant};
 
 use poise::serenity_prelude::{ChannelId, UserId};
 
+use crate::commands::highlight::HighlightConfig;
+
 use super::{HighlightCooldowns, RegexHolder, sanitize_content};
 
 const WINDOW: Duration = Duration::from_mins(1);
+const CONFIG: HighlightConfig = HighlightConfig { cooldown: WINDOW };
 
 fn holder(patterns: &[(u64, &str)]) -> RegexHolder {
 	RegexHolder::from_patterns(
@@ -61,7 +64,7 @@ fn invalid_patterns_are_skipped() {
 
 #[test]
 fn try_notify_respects_window() {
-	let mut cooldowns = HighlightCooldowns::new(WINDOW);
+	let mut cooldowns = HighlightCooldowns::new(CONFIG);
 	let (user, channel) = (UserId::new(1), ChannelId::new(2));
 	let now = Instant::now();
 
@@ -74,7 +77,7 @@ fn try_notify_respects_window() {
 
 #[test]
 fn activity_suppresses_notification() {
-	let mut cooldowns = HighlightCooldowns::new(WINDOW);
+	let mut cooldowns = HighlightCooldowns::new(CONFIG);
 	let (user, channel) = (UserId::new(1), ChannelId::new(2));
 	let now = Instant::now();
 
@@ -84,7 +87,7 @@ fn activity_suppresses_notification() {
 
 #[test]
 fn expired_entries_are_pruned_when_sweep_fires() {
-	let mut cooldowns = HighlightCooldowns::new(WINDOW);
+	let mut cooldowns = HighlightCooldowns::new(CONFIG);
 	let now = Instant::now();
 	cooldowns.mark_active(UserId::new(1), ChannelId::new(1), now);
 	assert_eq!(cooldowns.expiries.len(), 1);
@@ -102,7 +105,7 @@ fn expired_entries_are_pruned_when_sweep_fires() {
 
 #[test]
 fn pruning_is_amortised_within_window() {
-	let mut cooldowns = HighlightCooldowns::new(WINDOW);
+	let mut cooldowns = HighlightCooldowns::new(CONFIG);
 	let now = Instant::now();
 	cooldowns.mark_active(UserId::new(1), ChannelId::new(1), now);
 
