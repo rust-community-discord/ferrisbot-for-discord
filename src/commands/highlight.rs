@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::LazyLock;
@@ -20,8 +21,8 @@ static CUSTOM_EMOJI: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"<a?:\w+:\d+>").expect("valid custom-emoji regex"));
 
 /// Strips Discord custom-emoji markup so patterns don't match emoji names.
-fn sanitize_content(content: &str) -> String {
-	CUSTOM_EMOJI.replace_all(content, " ").into_owned()
+fn sanitize_content(content: &str) -> Cow<'_, str> {
+	CUSTOM_EMOJI.replace_all(content, " ")
 }
 
 /// Compiles a pattern; case-insensitive unless the inline `(?-i)` flag is set.
