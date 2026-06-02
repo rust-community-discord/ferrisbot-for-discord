@@ -107,24 +107,13 @@ pub async fn list(c: Context<'_>) -> Result<()> {
 	Ok(())
 }
 
-pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Result<Vec<String>> {
-	let patterns = database::highlight_get(db, author).await?;
-	Ok(patterns
-		.into_iter()
-		.filter_map(|(_id, pattern)| {
-			compile_pattern(&pattern)
-				.ok()
-				.filter(|regex| regex.is_match(haystack))
-				.map(|_| pattern)
-		})
-		.collect())
-}
-
 #[poise::command(prefix_command, slash_command, rename = "match")]
 /// Tests if your highlights match a given string
 pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
-	let db = require_database!(c);
-	let x = matches(c.author().id, &haystack, db).await?;
+	let x = {
+		let hl = c.data().highlights.read().await;
+		hl.find_for_user(c.author().id, &haystack)
+	};
 
 	poise::send_reply(
 		c,
@@ -186,13 +175,27 @@ impl RegexHolder {
 		*data.highlights.write().await = new;
 	}
 
+	fn matches<'a>(
+		entries: impl Iterator<Item = &'a (UserId, Regex)> + 'a,
+		haystack: &'a str,
+	) -> impl Iterator<Item = (UserId, &'a Regex)> {
+		let haystack = sanitize_content(haystack);
+		entries
+			.filter(move |(_, regex)| regex.is_match(&haystack))
+			.map(|(user_id, regex)| (*user_id, regex))
+	}
+
 	#[must_use]
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
-		let haystack = sanitize_content(haystack);
-		self.0
-			.iter()
-			.filter(|&(_user_id, regex)| regex.is_match(&haystack))
-			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
+		Self::matches(self.0.iter(), haystack)
+			.map(|(user_id, regex)| (user_id, regex.as_str().to_owned()))
+			.collect()
+	}
+
+	#[must_use]
+	pub fn find_for_user(&self, user: UserId, haystack: &str) -> Vec<String> {
+		Self::matches(self.0.iter().filter(move |(id, _)| *id == user), haystack)
+			.map(|(_, regex)| regex.as_str().to_owned())
 			.collect()
 	}
 }

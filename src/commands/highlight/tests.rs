@@ -55,6 +55,24 @@ fn custom_emoji_names_do_not_match() {
 }
 
 #[test]
+fn find_for_user_returns_only_the_authors_matches() {
+	let hl = holder(&[(1, "foo"), (1, "bar"), (2, "foo")]);
+	let mut m = hl.find_for_user(UserId::new(1), "foo bar baz");
+	m.sort();
+	assert_eq!(m, vec!["bar".to_string(), "foo".to_string()]);
+	assert!(hl.find_for_user(UserId::new(3), "foo").is_empty());
+}
+
+#[test]
+fn find_for_user_sanitizes_custom_emoji() {
+	let hl = holder(&[(1, "ferris")]);
+	assert!(
+		hl.find_for_user(UserId::new(1), "<:ferrisClueless:1180624887707074641>")
+			.is_empty()
+	);
+}
+
+#[test]
 fn invalid_patterns_are_skipped() {
 	let hl = holder(&[(1, "("), (2, "valid")]);
 	let recipients = hl.find("this is valid");
