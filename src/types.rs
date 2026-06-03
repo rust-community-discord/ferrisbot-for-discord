@@ -7,11 +7,15 @@ use anyhow::{Error, Result};
 use poise::serenity_prelude as serenity;
 use tokio::sync::RwLock;
 
-use crate::{SecretStore, commands};
+use crate::{
+	SecretStore,
+	commands::{self, highlight::HighlightConfig},
+};
 
 #[derive(Debug)]
 pub struct Data {
 	pub highlights: RwLock<commands::highlight::RegexHolder>,
+	pub highlight_cooldowns: StdMutex<commands::highlight::HighlightCooldowns>,
 	pub database: Option<sqlx::SqlitePool>,
 	pub discord_guild_id: serenity::GuildId,
 	pub application_id: serenity::UserId,
@@ -31,9 +35,13 @@ impl Data {
 	pub async fn new(
 		secret_store: &SecretStore,
 		database: Option<sqlx::SqlitePool>,
+		highlight: HighlightConfig,
 	) -> Result<Self> {
 		Ok(Self {
 			highlights: RwLock::new(commands::highlight::RegexHolder::new(database.as_ref()).await),
+			highlight_cooldowns: StdMutex::new(commands::highlight::HighlightCooldowns::new(
+				highlight,
+			)),
 			database,
 			discord_guild_id: secret_store.get_discord_id("DISCORD_GUILD")?.into(),
 			application_id: secret_store.get_discord_id("APPLICATION_ID")?.into(),

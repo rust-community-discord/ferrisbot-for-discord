@@ -19,6 +19,7 @@ use poise::serenity_prelude::{self as serenity, ChannelType, Permissions};
 use rand::{Rng, seq::IteratorRandom};
 use tracing::{debug, info, warn};
 
+use crate::commands::highlight::HighlightConfig;
 use crate::commands::modmail::{create_modmail_thread, load_or_create_modmail_message};
 use crate::types::Data;
 
@@ -68,6 +69,7 @@ impl From<serenity::Client> for ShuttleSerenity {
 pub async fn serenity(
 	secret_store: SecretStore,
 	database: Option<sqlx::SqlitePool>,
+	highlight: HighlightConfig,
 ) -> Result<ShuttleSerenity, Error> {
 	let token = secret_store
 		.get("DISCORD_TOKEN")
@@ -85,7 +87,7 @@ pub async fn serenity(
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, ready, framework| {
 			Box::pin(async move {
-				let data = Data::new(&secret_store, database).await?;
+				let data = Data::new(&secret_store, database, highlight).await?;
 
 				info!(
 					"Registering {} commands...",
@@ -304,13 +306,24 @@ async fn event_handler(
 			if let Some(gid) = new_message.guild_id
 				&& !new_message.author.bot
 			{
+				// Author is active in this channel, so don't ping them.
+				let now = std::time::Instant::now();
+				{
+					let (Ok(mut cooldowns) | Err(mut cooldowns)) = data
+						.highlight_cooldowns
+						.lock()
+						.map_err(std::sync::PoisonError::into_inner);
+					cooldowns.mark_active(new_message.author.id, new_message.channel_id, now);
+				}
+
 				let hl = data.highlights.read().await;
 				let matches = hl.find(&new_message.content);
 				let message_link = new_message.link();
 				let message_link = &*message_link;
 				let mut stream = futures::stream::iter(matches)
 					.map(|(person_id, matcher)| async move {
-						if let Ok(member) = gid.member(ctx, person_id).await
+						if person_id != new_message.author.id
+							&& let Ok(member) = gid.member(ctx, person_id).await
 							&& let Ok(p) = gid.to_partial_guild(ctx).await
 							&& let Ok(Some(channel)) = if let Ok(Some(x)) = p
 								.channels(ctx)
@@ -335,6 +348,16 @@ async fn event_handler(
 									.ok()
 									.map(|x| x.user_id) == Some(member.user.id))
 						{
+							{
+								let now = std::time::Instant::now();
+								let (Ok(mut cooldowns) | Err(mut cooldowns)) = data
+									.highlight_cooldowns
+									.lock()
+									.map_err(std::sync::PoisonError::into_inner);
+								if !cooldowns.try_notify(person_id, new_message.channel_id, now) {
+									return;
+								}
+							}
 							_ = person_id
 								.direct_message(
 									ctx,

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, panic, path::PathBuf, str::FromStr, sync::LazyLock};
 
-use ferrisbot_for_discord::SecretStore;
+use ferrisbot_for_discord::{SecretStore, commands::highlight::HighlightConfig};
 use figment::{
 	Figment,
 	providers::{Env, Format as _, Serialized, Toml},
@@ -36,6 +36,7 @@ struct DatabaseConfig {
 struct Config {
 	log: LogConfig,
 	database: DatabaseConfig,
+	highlight: HighlightConfig,
 	secrets: HashMap<String, String>,
 }
 
@@ -53,6 +54,9 @@ static DEFAULT_CONFIG: LazyLock<serde_json::Value> = LazyLock::new(|| {
 		"database": {
 			"disabled": false,
 			"url": "sqlite://database/ferris.sqlite3"
+		},
+		"highlight": {
+			"cooldown": "5m"
 		},
 		"secrets": {}
 	})
@@ -107,7 +111,7 @@ fn app(config: &Config) -> Result<(), AppError> {
 				.collect(),
 		);
 
-		let mut client = ferrisbot_for_discord::serenity(secret_store, pool)
+		let mut client = ferrisbot_for_discord::serenity(secret_store, pool, config.highlight)
 			.await
 			.context(SerenityInitSnafu)?;
 

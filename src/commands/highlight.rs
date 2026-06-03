@@ -1,13 +1,34 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 use crate::{require_database, types::Context};
 use anyhow::{Error, Result};
 use poise::{
 	CreateReply,
-	serenity_prelude::{CreateEmbed, UserId},
+	serenity_prelude::{ChannelId, CreateEmbed, UserId},
 };
 use regex::{Regex, RegexBuilder};
+use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
+
+#[cfg(test)]
+mod tests;
+
+static CUSTOM_EMOJI: LazyLock<Regex> =
+	LazyLock::new(|| Regex::new(r"<a?:\w+:\d+>").expect("valid custom-emoji regex"));
+
+/// Strips Discord custom-emoji markup so patterns don't match emoji names.
+fn sanitize_content(content: &str) -> Cow<'_, str> {
+	CUSTOM_EMOJI.replace_all(content, " ")
+}
+
+/// Compiles a pattern; case-insensitive unless the inline `(?-i)` flag is set.
+fn compile_pattern(pattern: &str) -> Result<Regex, regex::Error> {
+	RegexBuilder::new(pattern).case_insensitive(true).build()
+}
 
 #[allow(clippy::unused_async)]
 #[poise::command(
@@ -25,7 +46,11 @@ pub async fn highlight(_: Context<'_>) -> Result<(), Error> {
 pub async fn add(c: Context<'_>, regex: String) -> Result<()> {
 	let db = require_database!(c);
 
-	if let Err(e) = RegexBuilder::new(&regex).size_limit(1 << 10).build() {
+	if let Err(e) = RegexBuilder::new(&regex)
+		.size_limit(1 << 10)
+		.case_insensitive(true)
+		.build()
+	{
 		c.say(format!("```\n{e}```")).await?;
 		return Ok(());
 	}
@@ -82,24 +107,13 @@ pub async fn list(c: Context<'_>) -> Result<()> {
 	Ok(())
 }
 
-pub async fn matches(author: UserId, haystack: &str, db: &Pool<Sqlite>) -> Result<Vec<String>> {
-	let patterns = database::highlight_get(db, author).await?;
-	Ok(patterns
-		.into_iter()
-		.filter_map(|(_id, pattern)| {
-			Regex::new(&pattern)
-				.ok()
-				.filter(|regex| regex.is_match(haystack))
-				.map(|_| pattern)
-		})
-		.collect())
-}
-
 #[poise::command(prefix_command, slash_command, rename = "match")]
 /// Tests if your highlights match a given string
 pub async fn mat(c: Context<'_>, haystack: String) -> Result<()> {
-	let db = require_database!(c);
-	let x = matches(c.author().id, &haystack, db).await?;
+	let x = {
+		let hl = c.data().highlights.read().await;
+		hl.find_for_user(c.author().id, &haystack)
+	};
 
 	poise::send_reply(
 		c,
@@ -132,10 +146,20 @@ impl RegexHolder {
 			}
 		};
 
-		let entries = rows
+		Self::from_patterns(
+			rows.into_iter()
+				.map(|(member_id, highlight)| (UserId::new(member_id.cast_unsigned()), highlight)),
+		)
+	}
+
+	/// Compiles `(user, pattern)` pairs into a holder, skipping invalid patterns.
+	fn from_patterns(patterns: impl IntoIterator<Item = (UserId, String)>) -> Self {
+		use tracing::warn;
+
+		let entries = patterns
 			.into_iter()
-			.filter_map(|(member_id, highlight)| match Regex::new(&highlight) {
-				Ok(regex) => Some((UserId::new(member_id.cast_unsigned()), regex)),
+			.filter_map(|(member_id, highlight)| match compile_pattern(&highlight) {
+				Ok(regex) => Some((member_id, regex)),
 				Err(e) => {
 					warn!("Invalid regex pattern '{highlight}' for member {member_id}: {e}");
 					None
@@ -151,13 +175,82 @@ impl RegexHolder {
 		*data.highlights.write().await = new;
 	}
 
+	fn matches<'a>(
+		entries: impl Iterator<Item = &'a (UserId, Regex)> + 'a,
+		haystack: &'a str,
+	) -> impl Iterator<Item = (UserId, &'a Regex)> {
+		let haystack = sanitize_content(haystack);
+		entries
+			.filter(move |(_, regex)| regex.is_match(&haystack))
+			.map(|(user_id, regex)| (*user_id, regex))
+	}
+
 	#[must_use]
 	pub fn find(&self, haystack: &str) -> HashMap<UserId, String> {
-		self.0
-			.iter()
-			.filter(|&(_user_id, regex)| regex.is_match(haystack))
-			.map(|(user_id, regex)| (*user_id, regex.as_str().to_string()))
+		Self::matches(self.0.iter(), haystack)
+			.map(|(user_id, regex)| (user_id, regex.as_str().to_owned()))
 			.collect()
+	}
+
+	#[must_use]
+	pub fn find_for_user(&self, user: UserId, haystack: &str) -> Vec<String> {
+		Self::matches(self.0.iter().filter(move |(id, _)| *id == user), haystack)
+			.map(|(_, regex)| regex.as_str().to_owned())
+			.collect()
+	}
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub struct HighlightConfig {
+	#[serde(with = "humantime_serde")]
+	cooldown: std::time::Duration,
+}
+
+/// Per-`(user, channel)` cooldown expiry instants. Expired entries are swept
+/// lazily (at most once per window) by `mark_active`, so `try_notify` needn't prune.
+#[derive(Debug)]
+pub struct HighlightCooldowns {
+	window: Duration,
+	expiries: HashMap<(UserId, ChannelId), Instant>,
+	next_prune: Instant,
+}
+
+impl HighlightCooldowns {
+	pub fn new(HighlightConfig { cooldown }: HighlightConfig) -> Self {
+		Self {
+			window: cooldown,
+			expiries: HashMap::new(),
+			next_prune: Instant::now(),
+		}
+	}
+
+	/// Refreshes the cooldown unconditionally (the user posted, so don't ping them).
+	pub fn mark_active(&mut self, user: UserId, channel: ChannelId, now: Instant) {
+		self.expiries.insert((user, channel), now + self.window);
+		self.prune_amortised(now);
+	}
+
+	/// Starts a cooldown unless one is active; returns whether to send a DM.
+	pub fn try_notify(&mut self, user: UserId, channel: ChannelId, now: Instant) -> bool {
+		match self.expiries.entry((user, channel)) {
+			Entry::Occupied(entry) if *entry.get() > now => false,
+			Entry::Occupied(mut entry) => {
+				entry.insert(now + self.window);
+				true
+			}
+			Entry::Vacant(entry) => {
+				entry.insert(now + self.window);
+				true
+			}
+		}
+	}
+
+	fn prune_amortised(&mut self, now: Instant) {
+		if now < self.next_prune {
+			return;
+		}
+		self.expiries.retain(|_, expiry| *expiry > now);
+		self.next_prune = now + self.window;
 	}
 }
 
