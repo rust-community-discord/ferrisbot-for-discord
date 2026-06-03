@@ -216,10 +216,9 @@ pub struct HighlightCooldowns {
 }
 
 impl HighlightCooldowns {
-	#[must_use]
-	pub fn new(config: HighlightConfig) -> Self {
+	pub fn new(HighlightConfig { cooldown }: HighlightConfig) -> Self {
 		Self {
-			window: config.cooldown,
+			window: cooldown,
 			expiries: HashMap::new(),
 			next_prune: Instant::now(),
 		}
