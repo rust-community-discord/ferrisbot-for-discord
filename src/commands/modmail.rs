@@ -1,6 +1,6 @@
 use anyhow::{Context as AnyhowContext, Error, anyhow};
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::{EditThread, GuildChannel, Mentionable, UserId};
+use poise::serenity_prelude::{EditThread, GuildChannel, MESSAGE_CODE_LIMIT, Mentionable, UserId};
 use rand::Rng;
 use tracing::{debug, info};
 
@@ -192,24 +192,38 @@ pub async fn create_modmail_thread(
 		.edit_thread(&http, EditThread::new().invitable(false))
 		.await?;
 
-	let thread_message_content = format!(
-		"Hey {} (cc: {}), {} needs help with the following:\n> {}",
+	let thread_message_context = format!(
+		"Hey {} (cc: {}), {} needs help with the following:",
 		data.mod_role_id.mention(),
 		data.mod_consultant_role_id.mention(),
 		user_id.mention(),
-		user_message.into()
 	);
+
+	let user_message = user_message.into();
+
+	let thread_message_length = thread_message_context.chars().count();
+	// If there are more than the maximum amount of chars, send message as messsage.txt
+	let message_needs_into_file = user_message
+		.chars()
+		.nth(MESSAGE_CODE_LIMIT - thread_message_length - 2) // 2 for newlines
+		.is_some();
+	let thread_message = if message_needs_into_file {
+		let file = serenity::CreateAttachment::bytes(user_message, "message.txt");
+		serenity::CreateMessage::new()
+			.content(thread_message_context)
+			.add_file(file)
+	} else {
+		serenity::CreateMessage::new().content(thread_message_context + "\n\n" + &user_message)
+	};
 
 	modmail_thread
 		.send_message(
 			&http,
-			serenity::CreateMessage::new()
-				.content(thread_message_content)
-				.allowed_mentions(
-					serenity::CreateAllowedMentions::new()
-						.users([user_id])
-						.roles([data.mod_role_id, data.mod_consultant_role_id]),
-				),
+			thread_message.allowed_mentions(
+				serenity::CreateAllowedMentions::new()
+					.users([user_id])
+					.roles([data.mod_role_id, data.mod_consultant_role_id]),
+			),
 		)
 		.await?;
 
