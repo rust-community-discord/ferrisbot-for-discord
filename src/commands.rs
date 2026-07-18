@@ -1,6 +1,7 @@
 pub use godbolt::*;
 pub use playground::*;
 
+pub mod bangs;
 pub mod crates;
 pub mod godbolt;
 pub mod highlight;

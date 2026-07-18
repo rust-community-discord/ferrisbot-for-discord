@@ -209,6 +209,11 @@ pub async fn serenity(
 fn build_command_list(enable_database: bool) -> Vec<poise::Command<Data, Error>> {
 	let mut command_list = vec![
 		commands::man::man(),
+		commands::bangs::gh_bang(),
+		commands::bangs::duckduckgo_bang(),
+		commands::bangs::codeberg_bang(),
+		commands::bangs::wikipedia_bang(),
+		commands::bangs::google_bang(),
 		commands::crates::crate_(),
 		commands::crates::doc(),
 		commands::godbolt::godbolt(),
